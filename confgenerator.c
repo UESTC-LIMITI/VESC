@@ -209,7 +209,7 @@ int32_t confgenerator_serialize_mcconf(uint8_t *buffer, const mc_configuration *
 	return ind;
 }
 
-int32_t confgenerator_serialize_appconf(uint8_t *buffer, const app_configuration *conf) {
+int32_t confgenerator_serialize_appconf(uint8_t *buffer, const app_configuration *conf) {   
 	int32_t ind = 0;
 
 	buffer_append_uint32(buffer, APPCONF_SIGNATURE, &ind);

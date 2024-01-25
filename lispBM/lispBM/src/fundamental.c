@@ -20,6 +20,7 @@
 #include "stack.h"
 #include "heap.h"
 #include "eval_cps.h"
+#include "lbm_variables.h"
 #include "env.h"
 #include "lbm_utils.h"
 #include "lbm_custom_type.h"
@@ -713,32 +714,28 @@ static lbm_value fundamental_append(lbm_value *args, lbm_uint nargs, eval_contex
 
 static lbm_value fundamental_undefine(lbm_value *args, lbm_uint nargs, eval_context_t *ctx) {
   (void) ctx;
-  lbm_value *global_env = lbm_get_global_env();
+  lbm_value env = lbm_get_env();
+  lbm_value new_env = env;
+  lbm_value result = ENC_SYM_EERROR;
   if (nargs == 1 && lbm_is_symbol(args[0])) {
-    lbm_value key = args[0];
-    lbm_uint ix_key = lbm_dec_sym(key) & GLOBAL_ENV_MASK;
-    lbm_value env = global_env[ix_key];
-    lbm_value res = lbm_env_drop_binding(env, key);
-    if (res == ENC_SYM_NOT_FOUND) {
-      return ENC_SYM_NIL;
+    result = lbm_env_drop_binding(env, args[0]);
+    if (result == ENC_SYM_NOT_FOUND) {
+      return env;
     }
-    global_env[ix_key] = res;
-    return ENC_SYM_TRUE;
+    *lbm_get_env_ptr() = result;
   } else if (nargs == 1 && lbm_is_cons(args[0])) {
     lbm_value curr = args[0];
     while (lbm_type_of(curr) == LBM_TYPE_CONS) {
       lbm_value key = lbm_car(curr);
-      lbm_uint ix_key = lbm_dec_sym(key) & GLOBAL_ENV_MASK;
-      lbm_value env = global_env[ix_key];
-      lbm_value res = lbm_env_drop_binding(env, key);
-      if (res != ENC_SYM_NOT_FOUND) {
-        global_env[ix_key] = res;
+      result = lbm_env_drop_binding(new_env, key);
+      if (result != ENC_SYM_NOT_FOUND) {
+        new_env = result;
       }
       curr = lbm_cdr(curr);
     }
-    return ENC_SYM_TRUE;
+    *lbm_get_env_ptr() = new_env;
   }
-  return ENC_SYM_TERROR;
+  return new_env;
 }
 
 static lbm_value fundamental_buf_create(lbm_value *args, lbm_uint nargs, eval_context_t *ctx) {
@@ -1250,8 +1247,7 @@ static lbm_value fundamental_take(lbm_value *args, lbm_uint nargs, eval_context_
   if (nargs != 2 || !IS_NUMBER(args[1]) || !lbm_is_list(args[0]))
     return ENC_SYM_TERROR;
 
-  int len = lbm_dec_as_i32(args[1]);
-  return lbm_list_copy(&len, args[0]);
+  return lbm_list_copy(lbm_dec_as_i32(args[1]), args[0]);
 }
 
 static lbm_value fundamental_drop(lbm_value *args, lbm_uint nargs, eval_context_t *ctx) {

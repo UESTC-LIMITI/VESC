@@ -329,7 +329,7 @@
 #endif
 #endif
 
-// Current ADC macros. Override them for custom current measurement functions.
+// Current ADC macros. Override them for custom current measurement functions. //在客制化固件中重写
 #ifndef GET_CURRENT1
 #ifdef INVERTED_SHUNT_POLARITY
 #define GET_CURRENT1()		(4095.0 - (float)ADC_Value[ADC_IND_CURR1])

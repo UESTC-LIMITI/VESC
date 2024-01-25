@@ -16,7 +16,8 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
+#define HW_HAS_3_SHUNTS
+#define HW_HAS_PHASE_SHUNTS  //临时加的
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -41,6 +42,43 @@
 #include <stdio.h>
 #include "virtual_motor.h"
 #include "foc_math.h"
+
+#if defined(SHOOT_TEST)  //SHOOT_TEST的计算用变量
+int mul_pos_base = 0;
+float mul_pos = 0;
+float pos_temp = 0;
+float pos_temp_pre = 0;
+int sampled_points = 0;
+uint8_t finish_flag = 0;
+float brake_pos = 0;
+float brake_speed = 0;
+uint8_t state_now = 0;
+float max_speed_record = 0;
+float max_speed_pos_record = 0;
+float reset_pos = 0;
+float reset_pos_deadband = 0.2;
+
+int16_t speed_record[SEND_NUM] = {0};
+int16_t pos_record[SEND_NUM] = {0};
+uint16_t record_counter = 0;
+
+int16_t accel_counter = 0;
+float dI = 0.1;
+float sumI = 0;
+
+extern float accel_current;
+extern float limit_speed;
+extern float target_speed;
+extern float limit_pos;
+extern int sample_points;
+extern float brake_current;
+extern CUSTOM_MODE custom_mode;
+extern float reset_pos_sample_points;
+extern float target_duty;
+
+extern int send_counter_speed;
+extern int send_counter_pos;
+#endif
 
 // Private variables
 static volatile bool m_dccal_done = false;
@@ -330,19 +368,6 @@ static void timer_reinit(int f_zv) {
 	nvicEnableVector(TIM2_IRQn, 6);
 }
 
-static void init_audio_state(volatile mc_audio_state *s) {
-	memset((void*)s, 0, sizeof(mc_audio_state));
-
-	s->mode = MC_AUDIO_OFF;
-	for (int i = 0;i < MC_AUDIO_CHANNELS;i++) {
-		s->table[i] = utils_tab_sin_32_1;
-		s->table_len[i] = 32;
-		s->table_voltage[i] = 0.0;
-		s->table_freq[i] = 1000.0;
-		s->table_pos[i] = 0.0;
-	}
-}
-
 void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 	utils_sys_lock_cnt();
 
@@ -361,7 +386,6 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 	m_motor_1.m_hall_dt_diff_last = 1.0;
 	foc_precalc_values((motor_all_state_t*)&m_motor_1);
 	update_hfi_samples(m_motor_1.m_conf->foc_hfi_samples, &m_motor_1);
-	init_audio_state(&m_motor_1.m_audio);
 
 #ifdef HW_HAS_DUAL_MOTORS
 	memset((void*)&m_motor_2, 0, sizeof(motor_all_state_t));
@@ -371,7 +395,6 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 	m_motor_2.m_hall_dt_diff_last = 1.0;
 	foc_precalc_values((motor_all_state_t*)&m_motor_2);
 	update_hfi_samples(m_motor_2.m_conf->foc_hfi_samples, &m_motor_2);
-	init_audio_state(&m_motor_2.m_audio);
 #endif
 
 	virtual_motor_init(conf_m1);
@@ -612,7 +635,7 @@ void mcpwm_foc_deinit(void) {
 	dmaStreamRelease(STM32_DMA_STREAM(STM32_DMA_STREAM_ID(2, 4)));
 }
 
-static volatile motor_all_state_t *get_motor_now(void) {
+static volatile motor_all_state_t *get_motor_now(void) {  //用于返回现在motor的所有参数
 #ifdef HW_HAS_DUAL_MOTORS
 	return mc_interface_motor_now() == 1 ? &m_motor_1 : &m_motor_2;
 #else
@@ -787,19 +810,17 @@ void mcpwm_foc_set_pid_pos(float pos) {
  * The current to use.
  */
 void mcpwm_foc_set_current(float current) {
-	volatile motor_all_state_t *motor = get_motor_now();
-
-	motor->m_control_mode = CONTROL_MODE_CURRENT;
-	motor->m_iq_set = current;
-	motor->m_id_set = 0;
+	get_motor_now()->m_control_mode = CONTROL_MODE_CURRENT;
+	get_motor_now()->m_iq_set = current;
+	get_motor_now()->m_id_set = 0;
 	
-	if (fabsf(current) < motor->m_conf->cc_min_current) {
+	if (fabsf(current) < get_motor_now()->m_conf->cc_min_current) {
 		return;
 	}
 
-	if (motor->m_state != MC_STATE_RUNNING) {
-		motor->m_motor_released = false;
-		motor->m_state = MC_STATE_RUNNING;
+	if (get_motor_now()->m_state != MC_STATE_RUNNING) {
+		get_motor_now()->m_motor_released = false;
+		get_motor_now()->m_state = MC_STATE_RUNNING;
 	}
 }
 
@@ -1457,7 +1478,7 @@ float mcpwm_foc_get_est_ind(void) {
  * @return
  * The fault code
  */
-int mcpwm_foc_encoder_detect(float current, bool print, float *offset, float *ratio, bool *inverted) {
+int mcpwm_foc_encoder_detect(float current, bool print, float *offset, float *ratio, bool *inverted) {  //编码器整定函数
 	int fault = FAULT_CODE_NONE;
 	mc_interface_lock();
 
@@ -2031,10 +2052,6 @@ int mcpwm_foc_measure_inductance_current(float curr_goal, int samples, float *cu
 }
 
 bool mcpwm_foc_beep(float freq, float time, float voltage) {
-	if (mc_interface_get_fault() != FAULT_CODE_NONE) {
-		return false;
-	}
-
 	volatile motor_all_state_t *motor = get_motor_now();
 
 	mc_foc_sensor_mode sensor_mode_old = motor->m_conf->foc_sensor_mode;
@@ -2101,116 +2118,6 @@ bool mcpwm_foc_beep(float freq, float time, float voltage) {
 	mc_interface_unlock();
 
 	return true;
-}
-
-bool mcpwm_foc_play_tone(int channel, float freq, float voltage) {
-	if (mc_interface_get_fault() != FAULT_CODE_NONE) {
-		return false;
-	}
-
-	if (channel < 0 || channel >= MC_AUDIO_CHANNELS) {
-		return false;
-	}
-
-	volatile motor_all_state_t *motor = get_motor_now();
-
-	if (freq <= 0.1 || freq > motor->m_conf->foc_f_zv * 0.5) {
-		return false;
-	}
-
-	motor->m_audio.table_freq[channel] = freq;
-	motor->m_audio.table_voltage[channel] = voltage;
-	motor->m_audio.mode = MC_AUDIO_TABLE;
-
-	if (voltage < 0.01) {
-		return true;
-	}
-
-	mcpwm_foc_set_current_off_delay(1.0);
-
-	if (motor->m_state != MC_STATE_RUNNING) {
-		motor->m_control_mode = CONTROL_MODE_CURRENT;
-		motor->m_iq_set = 0.0;
-		motor->m_id_set = 0.0;
-		motor->m_motor_released = false;
-		motor->m_state = MC_STATE_RUNNING;
-	}
-
-	return true;
-}
-
-void mcpwm_foc_stop_audio(bool reset) {
-	volatile mc_audio_state *audio = &get_motor_now()->m_audio;
-	audio->mode = MC_AUDIO_OFF;
-
-	if (reset) {
-		init_audio_state(audio);
-	}
-}
-
-bool mcpwm_foc_set_audio_sample_table(int channel, float *samples, int len) {
-	if (channel < 0 || channel >= MC_AUDIO_CHANNELS) {
-		return false;
-	}
-
-	volatile mc_audio_state *audio = &get_motor_now()->m_audio;
-
-	audio->table[channel] = samples;
-	audio->table_len[channel] = len;
-	audio->table_pos[channel] = 0.0;
-
-	return true;
-}
-
-const float *mcpwm_foc_get_audio_sample_table(int channel) {
-	if (channel < 0 || channel >= MC_AUDIO_CHANNELS) {
-		return false;
-	}
-
-	volatile mc_audio_state *audio = &get_motor_now()->m_audio;
-
-	return audio->table[channel];
-}
-
-bool mcpwm_foc_play_audio_samples(const int8_t *samples, int num_samp, float f_samp, float voltage) {
-	if (mc_interface_get_fault() != FAULT_CODE_NONE) {
-		return false;
-	}
-
-	volatile motor_all_state_t *motor = get_motor_now();
-	volatile mc_audio_state *audio = &motor->m_audio;
-
-	audio->sample_freq = f_samp;
-	audio->sample_voltage = voltage;
-	motor->m_audio.mode = MC_AUDIO_SAMPLED;
-
-	bool res = false;
-
-	if (samples) {
-		if (!audio->sample_table_filled[0]) {
-			audio->sample_table[0] = samples;
-			audio->sample_table_len[0] = num_samp;
-			audio->sample_table_filled[0] = true;
-			res = true;
-		} else  if (!audio->sample_table_filled[1]) {
-			audio->sample_table[1] = samples;
-			audio->sample_table_len[1] = num_samp;
-			audio->sample_table_filled[1] = true;
-			res = true;
-		}
-	}
-
-	mcpwm_foc_set_current_off_delay(1.0);
-
-	if (motor->m_state != MC_STATE_RUNNING) {
-		motor->m_control_mode = CONTROL_MODE_CURRENT;
-		motor->m_iq_set = 0.0;
-		motor->m_id_set = 0.0;
-		motor->m_motor_released = false;
-		motor->m_state = MC_STATE_RUNNING;
-	}
-
-	return res;
 }
 
 /**
@@ -2795,7 +2702,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 
 	uint32_t t_start = timer_time_now();
 
-	bool is_v7 = !(TIM1->CR1 & TIM_CR1_DIR);
+	bool is_v7 = !(TIM1->CR1 & TIM_CR1_DIR);  //用TIM1状态判断是不是“v7”
 	int norm_curr_ofs = 0;
 
 #ifdef HW_HAS_DUAL_MOTORS
@@ -2810,9 +2717,9 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 #else
 	motor_all_state_t *motor_other = (motor_all_state_t*)&m_motor_1;
 	motor_all_state_t *motor_now = (motor_all_state_t*)&m_motor_1;;
-	m_isr_motor = 1;
+	m_isr_motor = 1;        //对单motor，用两个状态来描述motor1，isr标志置1
 #ifdef HW_HAS_3_SHUNTS
-	volatile TIM_TypeDef *tim = TIM1;
+	volatile TIM_TypeDef *tim = TIM1; //三个采样电阻，用TIM1？
 #endif
 #endif
 
@@ -2840,16 +2747,16 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		}
 #else
 		float curr0 = (GET_CURRENT1() - conf_other->foc_offsets_current[0]) * FAC_CURRENT;
-		float curr1 = (GET_CURRENT2() - conf_other->foc_offsets_current[1]) * FAC_CURRENT;
+		float curr1 = (GET_CURRENT2() - conf_other->foc_offsets_current[1]) * FAC_CURRENT; //采样了
 
-		TIMER_UPDATE_DUTY_M1(motor_other->m_duty1_next, motor_other->m_duty2_next, motor_other->m_duty3_next);
+		TIMER_UPDATE_DUTY_M1(motor_other->m_duty1_next, motor_other->m_duty2_next, motor_other->m_duty3_next); //更新定时器占空比，M1用TIM1控制
 #ifdef HW_HAS_DUAL_PARALLEL
 		TIMER_UPDATE_DUTY_M2(motor_other->m_duty1_next, motor_other->m_duty2_next, motor_other->m_duty3_next);
 #endif
 #endif
 
 		motor_other->m_i_alpha_sample_next = curr0;
-		motor_other->m_i_beta_sample_next = ONE_BY_SQRT3 * curr0 + TWO_BY_SQRT3 * curr1;
+		motor_other->m_i_beta_sample_next = ONE_BY_SQRT3 * curr0 + TWO_BY_SQRT3 * curr1; //根号3分之1
 	}
 
 	bool do_return = false;
@@ -2878,7 +2785,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 #endif
 
 	if (conf_other->foc_control_sample_mode == FOC_CONTROL_SAMPLE_MODE_V0_V7_INTERPOL && !skip_interpolation) {
-		float interpolated_phase = motor_other->m_motor_state.phase + motor_other->m_speed_est_fast * dt * 0.5;
+		float interpolated_phase = motor_other->m_motor_state.phase + motor_other->m_speed_est_fast * dt * 0.5;  //相位插值计算
 		utils_norm_angle_rad(&interpolated_phase);
 
 		float s, c;
@@ -2888,12 +2795,12 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		state_m->phase_sin = s;
 		state_m->phase_cos = c;
 		state_m->mod_alpha_raw = c * state_m->mod_d - s * state_m->mod_q;
-		state_m->mod_beta_raw  = c * state_m->mod_q + s * state_m->mod_d;
+		state_m->mod_beta_raw  = c * state_m->mod_q + s * state_m->mod_d;  //疑似帕克变换
 
 		uint32_t duty1, duty2, duty3, top;
 		top = TIM1->ARR;
 		foc_svm(state_m->mod_alpha_raw, state_m->mod_beta_raw,
-				top, &duty1, &duty2, &duty3, (uint32_t*)&state_m->svm_sector);
+				top, &duty1, &duty2, &duty3, (uint32_t*)&state_m->svm_sector);  //用SVPWM计算出三相占空比
 
 #ifdef HW_HAS_DUAL_MOTORS
 		if (is_second_motor) {
@@ -2974,7 +2881,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 #ifdef HW_HAS_3_SHUNTS
 	ADC_curr_norm_value[2 + norm_curr_ofs] = curr2;
 #else
-	ADC_curr_norm_value[2 + norm_curr_ofs] = -(ADC_curr_norm_value[0] + ADC_curr_norm_value[1]);
+	ADC_curr_norm_value[2 + norm_curr_ofs] = -(ADC_curr_norm_value[0] + ADC_curr_norm_value[1]);  //两个采样电阻，KCL得第三相电流
 #endif
 
 	// Use the best current samples depending on the modulation state.
@@ -2996,11 +2903,11 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 	} else if (conf_now->foc_current_sample_mode == FOC_CURRENT_SAMPLE_MODE_LONGEST_ZERO) {
 #ifdef HW_HAS_PHASE_SHUNTS
 		if (is_v7) {
-			if (tim->CCR1 > 500 && tim->CCR2 > 500) {
+			if (tim->CCR1 > 500 && tim->CCR2 > 500) {  //前两项占空比较大，用前两相计算第三相
 				// Use the same 2 shunts on low modulation, as that will avoid jumps in the current reading.
 				// This is especially important when using HFI.
 				ADC_curr_norm_value[2 + norm_curr_ofs] = -(ADC_curr_norm_value[0 + norm_curr_ofs] + ADC_curr_norm_value[1 + norm_curr_ofs]);
-			} else {
+			} else {  //三相的占空比都不太大，用高两相计算低一相
 				if (tim->CCR1 < tim->CCR2 && tim->CCR1 < tim->CCR3) {
 					ADC_curr_norm_value[0 + norm_curr_ofs] = -(ADC_curr_norm_value[1 + norm_curr_ofs] + ADC_curr_norm_value[2 + norm_curr_ofs]);
 				} else if (tim->CCR2 < tim->CCR1 && tim->CCR2 < tim->CCR3) {
@@ -3010,7 +2917,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 				}
 			}
 		} else {
-			if (tim->CCR1 < (tim->ARR - 500) && tim->CCR2 < (tim->ARR - 500)) {
+			if (tim->CCR1 < (tim->ARR - 500) && tim->CCR2 < (tim->ARR - 500)) {  //同上
 				// Use the same 2 shunts on low modulation, as that will avoid jumps in the current reading.
 				// This is especially important when using HFI.
 				ADC_curr_norm_value[2 + norm_curr_ofs] = -(ADC_curr_norm_value[0 + norm_curr_ofs] + ADC_curr_norm_value[1 + norm_curr_ofs]);
@@ -3056,45 +2963,45 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 	volatile float enc_ang = 0;
 	volatile bool encoder_is_being_used = false;
 
-	if (virtual_motor_is_connected()) {
+	if (virtual_motor_is_connected()) {  //“virtual motor”和使用encoder似乎是冲突的？那么“virtual motor”是不是对应无感？
 		if (conf_now->foc_sensor_mode == FOC_SENSOR_MODE_ENCODER ) {
 			enc_ang = virtual_motor_get_angle_deg();
 			encoder_is_being_used = true;
 		}
 	} else {
 		if (encoder_is_configured()) {
-			enc_ang = encoder_read_deg();
+			enc_ang = encoder_read_deg();   //在这里读编码器数据
 			encoder_is_being_used = true;
 		}
 	}
 
-	if (encoder_is_being_used) {
+	if (encoder_is_being_used) {  //使用编码器的数据转换
 		float phase_tmp = enc_ang;
-		if (conf_now->foc_encoder_inverted) {
+		if (conf_now->foc_encoder_inverted) {  //编码器翻转的转换
 			phase_tmp = 360.0 - phase_tmp;
 		}
 		phase_tmp *= conf_now->foc_encoder_ratio;
 		phase_tmp -= conf_now->foc_encoder_offset;
-		utils_norm_angle((float*)&phase_tmp);
-		motor_now->m_phase_now_encoder = DEG2RAD_f(phase_tmp);
+		utils_norm_angle((float*)&phase_tmp);  //编码器的转换，增益/偏差/多圈变单圈
+		motor_now->m_phase_now_encoder = DEG2RAD_f(phase_tmp);//角度->弧度
 	}
 
-	if (motor_now->m_state == MC_STATE_RUNNING) {
-		if (conf_now->foc_current_sample_mode == FOC_CURRENT_SAMPLE_MODE_ALL_SENSORS) {
+	if (motor_now->m_state == MC_STATE_RUNNING) {//电机运动的情况下的一堆赋值和计算
+		if (conf_now->foc_current_sample_mode == FOC_CURRENT_SAMPLE_MODE_ALL_SENSORS) { //使用三个采样电阻
 			// Full Clarke Transform
 			motor_now->m_motor_state.i_alpha = (2.0 / 3.0) * ia - (1.0 / 3.0) * ib - (1.0 / 3.0) * ic;
 			motor_now->m_motor_state.i_beta = ONE_BY_SQRT3 * ib - ONE_BY_SQRT3 * ic;
 		} else {
 			// Clarke transform assuming balanced currents
 			motor_now->m_motor_state.i_alpha = ia;
-			motor_now->m_motor_state.i_beta = ONE_BY_SQRT3 * ia + TWO_BY_SQRT3 * ib;
+			motor_now->m_motor_state.i_beta = ONE_BY_SQRT3 * ia + TWO_BY_SQRT3 * ib; //只用两个
 		}
 
 		motor_now->m_i_alpha_sample_with_offset = motor_now->m_motor_state.i_alpha;
 		motor_now->m_i_beta_sample_with_offset = motor_now->m_motor_state.i_beta;
 
-		if (motor_now->m_i_alpha_beta_has_offset) {
-			motor_now->m_motor_state.i_alpha = 0.5 * (motor_now->m_motor_state.i_alpha + motor_now->m_i_alpha_sample_next);
+		if (motor_now->m_i_alpha_beta_has_offset) {  //计算的α和β轴电流有偏差，进行补偿
+			motor_now->m_motor_state.i_alpha = 0.5 * (motor_now->m_motor_state.i_alpha + motor_now->m_i_alpha_sample_next); //相当于容量等于2的均值滤波？
 			motor_now->m_motor_state.i_beta = 0.5 * (motor_now->m_motor_state.i_beta + motor_now->m_i_beta_sample_next);
 			motor_now->m_i_alpha_beta_has_offset = false;
 		}
@@ -3102,10 +3009,10 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		const float duty_now = motor_now->m_motor_state.duty_now;
 		const float duty_abs = fabsf(duty_now);
 		const float vq_now = motor_now->m_motor_state.vq;
-		const float speed_fast_now = motor_now->m_pll_speed;
+		const float speed_fast_now = motor_now->m_pll_speed;  //相位环锁定（？）得到现在速度
 
 		float id_set_tmp = motor_now->m_id_set;
-		float iq_set_tmp = motor_now->m_iq_set;
+		float iq_set_tmp = motor_now->m_iq_set;  //搞一大堆临时变量用于下一步计算
 		motor_now->m_motor_state.max_duty = conf_now->l_max_duty;
 
 		if (motor_now->m_control_mode == CONTROL_MODE_CURRENT_BRAKE) {
@@ -3115,8 +3022,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		UTILS_LP_FAST(motor_now->m_duty_abs_filtered, duty_abs, 0.01);
 		utils_truncate_number_abs((float*)&motor_now->m_duty_abs_filtered, 1.0);
 
-		UTILS_LP_FAST(motor_now->m_duty_filtered, duty_now, 0.01);
-		utils_truncate_number_abs((float*)&motor_now->m_duty_filtered, 1.0);
+		UTILS_LP_FAST(motor_now->m_duty_filtered, duty_now, 0.01);//这一次滤波的数据 -= 上一次滤波后数据与这一次作比较的差值，乘以0.01
+		utils_truncate_number_abs((float*)&motor_now->m_duty_filtered, 1.0);//为什么要搞一大堆低通滤波呢？
 
 		float duty_set = motor_now->m_duty_cycle_set;
 		bool control_duty = motor_now->m_control_mode == CONTROL_MODE_DUTY ||
@@ -3178,7 +3085,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 
 		if (control_duty) {
 			// Duty cycle control
-			if (fabsf(duty_set) < (duty_abs - 0.01) &&
+			if (fabsf(duty_set) < (duty_abs - 0.01)/*占空比减小幅度大于0.01，则用一个PI控制器来控制*/  &&
 					(!motor_now->duty_was_pi || SIGN(motor_now->duty_pi_duty_last) == SIGN(duty_now))) {
 				// Truncating the duty cycle here would be dangerous, so run a PI controller.
 
@@ -3213,7 +3120,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 				// Calculate output
 				float output = p_term + motor_now->m_duty_i_term;
 				utils_truncate_number(&output, -1.0, 1.0);
-				iq_set_tmp = output * current_max_for_duty;
+				iq_set_tmp = output * current_max_for_duty;  //整个这一段，占空比从大到小的控制通过PI控制器来完成，最后这几行就是PI计算
 			} else {
 				// If the duty cycle is less than or equal to the set duty cycle just limit
 				// the modulation and use the maximum allowed current.
@@ -3224,11 +3131,11 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 				} else {
 					iq_set_tmp = -current_max_for_duty;
 				}
-				motor_now->duty_was_pi = false;
+				motor_now->duty_was_pi = false; //不使用PI控制器，直接加可以加的最大电流来尽快达到更高的占空比
 			}
 		} else if (motor_now->m_control_mode == CONTROL_MODE_CURRENT_BRAKE) {
 			// Braking
-			iq_set_tmp = -SIGN(speed_fast_now) * fabsf(iq_set_tmp);
+			iq_set_tmp = -SIGN(speed_fast_now) * fabsf(iq_set_tmp);  //刹车，直接给反向电流
 		}
 
 		// Set motor phase
@@ -3244,10 +3151,10 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 				utils_norm_angle_rad((float*)&motor_now->m_phase_now_observer);
 			}
 
-			switch (conf_now->foc_sensor_mode) {
+			switch (conf_now->foc_sensor_mode) {  //根据不同的encoder选择不同的参数设置，开始
 			case FOC_SENSOR_MODE_ENCODER:
 				if (encoder_index_found() || virtual_motor_is_connected()) {
-					motor_now->m_motor_state.phase = foc_correct_encoder(
+					motor_now->m_motor_state.phase = foc_correct_encoder(  //可能是检查编码器的值是否可靠
 							motor_now->m_phase_now_observer,
 							motor_now->m_phase_now_encoder,
 							motor_now->m_speed_est_fast,
@@ -3255,7 +3162,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 							motor_now);
 				} else {
 					// Rotate the motor in open loop if the index isn't found.
-					motor_now->m_motor_state.phase = motor_now->m_phase_now_encoder_no_index;
+					motor_now->m_motor_state.phase = motor_now->m_phase_now_encoder_no_index; //编码器失效，开环跑
 				}
 
 				if (!motor_now->m_phase_override && motor_now->m_control_mode != CONTROL_MODE_OPENLOOP_PHASE) {
@@ -3309,7 +3216,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 			case FOC_SENSOR_MODE_HFI_V2:
 			case FOC_SENSOR_MODE_HFI_V3:
 			case FOC_SENSOR_MODE_HFI_V4:
-			case FOC_SENSOR_MODE_HFI_V5:
+			case FOC_SENSOR_MODE_HFI_V5:  //高频注入
 				if (fabsf(RADPS2RPM_f(motor_now->m_speed_est_fast)) > conf_now->foc_sl_erpm_hfi) {
 					motor_now->m_hfi.observer_zero_time = 0;
 				} else {
@@ -3332,14 +3239,14 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 					id_set_tmp = 0.0;
 				}
 				break;
-			}
+			}  //根据不同的encoder选择不同的参数设置，结束
 
-			if (motor_now->m_control_mode == CONTROL_MODE_HANDBRAKE) {
+			if (motor_now->m_control_mode == CONTROL_MODE_HANDBRAKE) {  //根据不同的控制模式选择相位的计算方式，开始
 				// Force the phase to 0 in handbrake mode so that the current simply locks the rotor.
 				motor_now->m_motor_state.phase = 0.0;
 			} else if (motor_now->m_control_mode == CONTROL_MODE_OPENLOOP ||
 					motor_now->m_control_mode == CONTROL_MODE_OPENLOOP_DUTY) {
-				motor_now->m_openloop_angle += dt * motor_now->m_openloop_speed;
+				motor_now->m_openloop_angle += dt * motor_now->m_openloop_speed;  //开环，直接暴力预测位置=当前角度+时间*角速度
 				utils_norm_angle_rad((float*)&motor_now->m_openloop_angle);
 				motor_now->m_motor_state.phase = motor_now->m_openloop_angle;
 			} else if (motor_now->m_control_mode == CONTROL_MODE_OPENLOOP_PHASE ||
@@ -3348,16 +3255,16 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 			}
 
 			if (motor_now->m_phase_override) {
-				motor_now->m_motor_state.phase = motor_now->m_phase_now_override;
+				motor_now->m_motor_state.phase = motor_now->m_phase_now_override;//用obsever来控制，当前相位 = observer的相位
 			}
 
 			utils_fast_sincos_better(motor_now->m_motor_state.phase,
 					(float*)&motor_now->m_motor_state.phase_sin,
 					(float*)&motor_now->m_motor_state.phase_cos);
-		}
+		}//根据不同的控制模式选择相位的计算方式，结束
 
-		// Apply MTPA. See: https://github.com/vedderb/bldc/pull/179
-		const float ld_lq_diff = conf_now->foc_motor_ld_lq_diff;
+		// Apply MTPA. See: https://github.com/vedderb/bldc/pull/179    //应用单位电流最大转矩比值
+		const float ld_lq_diff = conf_now->foc_motor_ld_lq_diff;     //ld-lq diff
 		if (conf_now->foc_mtpa_mode != MTPA_MODE_OFF && ld_lq_diff != 0.0) {
 			const float lambda = conf_now->foc_motor_flux_linkage;
 
@@ -3373,7 +3280,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		const float mod_q = motor_now->m_motor_state.mod_q_filter;
 
 		// Running FW from the 1 khz timer seems fast enough.
-//		run_fw(motor_now, dt);
+		//run_fw(motor_now, dt);
 		id_set_tmp -= motor_now->m_i_fw_set;
 		iq_set_tmp -= SIGN(mod_q) * motor_now->m_i_fw_set * conf_now->foc_fw_q_current_factor;
 
@@ -3400,7 +3307,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		motor_now->m_motor_state.iq_target = iq_set_tmp;
 
 		control_current(motor_now, dt);
-	} else {
+	} else {  //电机不运动的情况下的一堆计算
 		// Motor is not running
 
 		// The current is 0 when the motor is undriven
@@ -3421,7 +3328,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		// Track back emf
 		update_valpha_vbeta(motor_now, 0.0, 0.0);
 
-		// Run observer
+		// Run observer     //不主动运动的时候也要跑observer吗
 		foc_observer_update(motor_now->m_motor_state.v_alpha, motor_now->m_motor_state.v_beta,
 						motor_now->m_motor_state.i_alpha, motor_now->m_motor_state.i_beta,
 						dt, &(motor_now->m_observer_state), 0, motor_now);
@@ -3438,7 +3345,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		motor_now->m_x2_prev = motor_now->m_observer_state.x2;
 
 		// Set motor phase
-		{
+		{  //和上面的 Set motor phase 应该是一样的
 			switch (conf_now->foc_sensor_mode) {
 			case FOC_SENSOR_MODE_ENCODER:
 				motor_now->m_motor_state.phase = foc_correct_encoder(
@@ -3512,25 +3419,25 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		motor_now->m_motor_state.vd_int = motor_now->m_motor_state.vd;
 		motor_now->m_motor_state.vq_int = motor_now->m_motor_state.vq;
 
-		if (conf_now->foc_cc_decoupling == FOC_CC_DECOUPLING_BEMF ||
-				conf_now->foc_cc_decoupling == FOC_CC_DECOUPLING_CROSS_BEMF) {
+		if (conf_now->foc_cc_decoupling == FOC_CC_DECOUPLING_BEMF || 
+				conf_now->foc_cc_decoupling == FOC_CC_DECOUPLING_CROSS_BEMF) {  //反电动势（BEMF）解耦
 			motor_now->m_motor_state.vq_int -= motor_now->m_pll_speed * conf_now->foc_motor_flux_linkage;
 		}
 
 		// Update corresponding modulation
 		/* voltage_normalize = 1/(2/3*V_bus) */
-		const float voltage_normalize = 1.5 / motor_now->m_motor_state.v_bus;
+		const float voltage_normalize = 1.5 / motor_now->m_motor_state.v_bus;  //电压归一化，但是为什么呢？
 
 		motor_now->m_motor_state.mod_d = motor_now->m_motor_state.vd * voltage_normalize;
 		motor_now->m_motor_state.mod_q = motor_now->m_motor_state.vq * voltage_normalize;
 		UTILS_NAN_ZERO(motor_now->m_motor_state.mod_q_filter);
 		UTILS_LP_FAST(motor_now->m_motor_state.mod_q_filter, motor_now->m_motor_state.mod_q, 0.2);
-		utils_truncate_number_abs((float*)&motor_now->m_motor_state.mod_q_filter, 1.0);
+		utils_truncate_number_abs((float*)&motor_now->m_motor_state.mod_q_filter, 1.0);  //计算出了vq和vd
 	}
 
 	// Calculate duty cycle
 	motor_now->m_motor_state.duty_now = SIGN(motor_now->m_motor_state.vq) *
-			NORM2_f(motor_now->m_motor_state.mod_d, motor_now->m_motor_state.mod_q) * TWO_BY_SQRT3;
+			NORM2_f(motor_now->m_motor_state.mod_d, motor_now->m_motor_state.mod_q) * TWO_BY_SQRT3;  //占空比是这样被计算出来的，似乎和电压有关
 
 	float phase_for_speed_est = 0.0;
 	switch (conf_now->foc_speed_soure) {
@@ -3630,6 +3537,287 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 
 	m_isr_motor = 0;
 	m_last_adc_isr_duration = timer_seconds_elapsed_since(t_start);
+
+#if defined(SHOOT_TEST)  //SHOOT_TEST 主要功能执行函数段
+	// Calculate the position of multiple turns
+	pos_temp = mc_interface_get_pid_pos_now();
+	if (pos_temp > 270 && pos_temp_pre < 90)
+		mul_pos_base -= 360;
+	else if (pos_temp < 90 && pos_temp_pre > 270)
+		mul_pos_base += 360;
+	pos_temp_pre = pos_temp;
+	mul_pos = mul_pos_base + pos_temp;
+
+	// Record max speed
+	if (mc_interface_get_rpm() > max_speed_record) {
+		max_speed_record = mc_interface_get_rpm();
+		max_speed_pos_record = mul_pos;
+	}
+		
+
+	// Custom mode
+	if (custom_mode == CUSTOM_MODE_NONE) {
+		finish_flag = 0;
+		sampled_points = 0;
+		max_speed_record = 0;
+		max_speed_pos_record = 0;
+		send_counter_speed = 0;
+		send_counter_pos = 0;
+		record_counter = 0;
+	} else if (custom_mode == CUSTOM_MODE_1) {
+		if (finish_flag == 0) {
+			if (record_counter < SEND_NUM) {
+				speed_record[record_counter] = (int16_t)mc_interface_get_rpm();
+				pos_record[record_counter++] = (int16_t)(mul_pos * 25);
+			}
+			switch (state_now) {
+			case 1:
+				if (mc_interface_get_rpm() >= target_speed) {
+					sampled_points++;
+					if (sampled_points >= sample_points) {
+						mc_interface_set_brake_current(brake_current);
+						brake_pos = mul_pos;
+						brake_speed = mc_interface_get_rpm();
+						sampled_points = 0;
+						finish_flag = 1;
+						state_now = 0;
+					}
+				} else
+					sampled_points = 0;
+				break;
+			default:
+				break;
+			}
+		}
+	} else if (custom_mode == CUSTOM_MODE_2) {
+		if (finish_flag == 0) {
+			switch (state_now) {
+			case 1:
+				if (mc_interface_get_rpm() >= limit_speed) {
+					sampled_points++;
+					if (sampled_points >= sample_points) {
+						mc_interface_set_pid_speed(target_speed);
+						sampled_points = 0;
+						state_now++;
+					}
+				} else
+					sampled_points = 0;
+				break;
+			case 2:
+				if (mul_pos >= limit_pos) {
+					sampled_points++;
+					if (sampled_points >= sample_points) {
+						mc_interface_set_brake_current(brake_current);
+						brake_pos = mul_pos;
+						brake_speed = mc_interface_get_rpm();
+						sampled_points = 0;
+						finish_flag = 1;
+						state_now = 0;
+					}
+				} else
+					sampled_points = 0;
+				break;
+			default:
+				break;
+			}
+		}
+	} else if (custom_mode == CUSTOM_MODE_3) {
+		if (finish_flag == 0) {
+			switch (state_now) {
+			case 1:
+				if (mul_pos <= 180 && mul_pos >= -180) {
+					sampled_points++;
+					if (sampled_points >= sample_points) {
+						mc_interface_set_pid_pos(reset_pos);
+						sampled_points = 0;
+						state_now++;
+					}
+				} else
+					sampled_points = 0;
+				break;
+			case 2:
+				if (mul_pos <= reset_pos + reset_pos_deadband && mul_pos >= reset_pos - reset_pos_deadband) {
+					sampled_points++;
+					if (sampled_points >= reset_pos_sample_points) {
+						mc_interface_set_brake_current(brake_current);
+						sampled_points = 0;
+						finish_flag = 1;
+						state_now = 0;
+					}
+				} else
+					sampled_points = 0;
+				break;
+			default:
+				break;
+			}
+		}
+	} else if (custom_mode == CUSTOM_MODE_4) {
+		if (finish_flag == 0) {
+			if (record_counter < SEND_NUM) {
+				speed_record[record_counter] = (int16_t)mc_interface_get_rpm();
+				pos_record[record_counter++] = (int16_t)(mul_pos * 25);
+			}
+			switch (state_now) {
+			case 1:
+				sumI += dI;
+				mc_interface_set_current(sumI);
+				if(accel_counter++ >= 600) {
+					accel_counter = 0;
+					sumI = 0;
+					state_now++;
+					mc_interface_set_current(accel_current);
+				}
+				break;
+			case 2:
+				if (mc_interface_get_rpm() >= target_speed) {
+					sampled_points++;
+					if (sampled_points >= sample_points) {
+						mc_interface_set_brake_current(brake_current);
+						brake_pos = mul_pos;
+						brake_speed = mc_interface_get_rpm();
+						sampled_points = 0;
+						finish_flag = 1;
+						state_now = 0;
+					}
+				} else
+					sampled_points = 0;
+				break;
+			default:
+				break;
+			}
+		}
+	} else if (custom_mode == CUSTOM_MODE_5) {
+		if (finish_flag == 0) {
+			if (record_counter < SEND_NUM) {
+				speed_record[record_counter] = (int16_t)mc_interface_get_rpm();
+				pos_record[record_counter++] = (int16_t)(mul_pos * 25);
+			}
+			switch (state_now) {
+			case 1:
+				if (mc_interface_get_rpm() >= 500) {
+					sampled_points++;
+					if (sampled_points >= sample_points) {
+						mc_interface_set_current(accel_current);
+						sampled_points = 0;
+						state_now++;
+					}
+				} else
+					sampled_points = 0;
+				break;
+			case 2:
+				if (mc_interface_get_rpm() >= target_speed) {
+					sampled_points++;
+					if (sampled_points >= sample_points) {
+						mc_interface_set_brake_current(brake_current);
+						brake_pos = mul_pos;
+						brake_speed = mc_interface_get_rpm();
+						sampled_points = 0;
+						finish_flag = 1;
+						state_now = 0;
+					}
+				} else
+					sampled_points = 0;
+				break;
+			default:
+				break;
+			}
+		}
+	} else if (custom_mode == CUSTOM_MODE_6) {
+		if (finish_flag == 0) {
+			if (record_counter < SEND_NUM) {
+				speed_record[record_counter] = (int16_t)mc_interface_get_rpm();
+				pos_record[record_counter++] = (int16_t)(mul_pos * 25);
+			}
+			switch (state_now) {
+			case 1:
+				if (mc_interface_get_rpm() >= 500) {
+					sampled_points++;
+					if (sampled_points >= sample_points) {
+						mc_interface_set_current(accel_current);
+						sampled_points = 0;
+						state_now++;
+					}
+				} else
+					sampled_points = 0;
+				break;
+			case 2:
+				if (mc_interface_get_rpm() >= target_speed) {
+					sampled_points++;
+					if (sampled_points >= sample_points) {
+						mc_interface_set_duty(mc_interface_get_duty_cycle_now());
+						sampled_points = 0;
+						state_now++;
+					}
+				} else
+					sampled_points = 0;
+				break;
+			case 3:
+				if (mul_pos >= limit_pos) {
+					sampled_points++;
+					if (sampled_points >= sample_points) {
+						mc_interface_set_brake_current(brake_current);
+						brake_pos = mul_pos;
+						brake_speed = mc_interface_get_rpm();
+						sampled_points = 0;
+						finish_flag = 1;
+						state_now = 0;
+					}
+				} else
+					sampled_points = 0;
+				break;
+			default:
+				break;
+			}
+		}
+	} else if (custom_mode == CUSTOM_MODE_7) {
+		if (finish_flag == 0) {
+			if (record_counter < SEND_NUM) {
+				speed_record[record_counter] = (int16_t)mc_interface_get_rpm();
+				pos_record[record_counter++] = (int16_t)(mul_pos * 25);
+			}
+			switch (state_now) {
+			case 1:
+				if (mc_interface_get_rpm() >= 500) {
+					sampled_points++;
+					if (sampled_points >= sample_points) {
+						mc_interface_set_current(accel_current);
+						sampled_points = 0;
+						state_now++;
+					}
+				} else
+					sampled_points = 0;
+				break;
+			case 2:
+				if (mc_interface_get_rpm() >= target_speed) {
+					sampled_points++;
+					if (sampled_points >= sample_points) {
+						mc_interface_set_duty(target_duty);
+						sampled_points = 0;
+						state_now++;
+					}
+				} else
+					sampled_points = 0;
+				break;
+			case 3:
+				if (mul_pos >= limit_pos) {
+					sampled_points++;
+					if (sampled_points >= sample_points) {
+						mc_interface_set_brake_current(brake_current);
+						brake_pos = mul_pos;
+						brake_speed = mc_interface_get_rpm();
+						sampled_points = 0;
+						finish_flag = 1;
+						state_now = 0;
+					}
+				} else
+					sampled_points = 0;
+				break;
+			default:
+				break;
+			}
+		}
+	}
+#endif
 }
 
 // Private functions
@@ -4368,60 +4556,6 @@ static void control_current(motor_all_state_t *motor, float dt) {
 	// Dead time compensated values for vd and vq. Note that these are not used to control the switching times.
 	state_m->vd = c * motor->m_motor_state.v_alpha + s * motor->m_motor_state.v_beta;
 	state_m->vq = c * motor->m_motor_state.v_beta  - s * motor->m_motor_state.v_alpha;
-
-	mc_audio_state *audio = &motor->m_audio;
-	switch (audio->mode) {
-	case MC_AUDIO_TABLE: {
-		float output = 0.0;
-
-		for (int i = 0;i < MC_AUDIO_CHANNELS; i++) {
-			float volts = audio->table_voltage[i];
-			audio->table_pos[i] += (float)audio->table_len[i] * audio->table_freq[i] * dt;
-			if (audio->table_pos[i] >= audio->table_len[i]) {
-				audio->table_pos[i] -= (float)audio->table_len[i];
-			}
-
-			if (volts > 0.01) {
-				int index = floorf(audio->table_pos[i]);
-				output += audio->table[i][index] * volts;
-			}
-		}
-
-		// Inject voltage along q-axis as that gives the most volume
-		output *= voltage_normalize;
-		state_m->mod_alpha_raw += -s * output;
-		state_m->mod_beta_raw  += c * output;
-		utils_saturate_vector_2d((float*)&state_m->mod_alpha_raw, (float*)&state_m->mod_beta_raw, SQRT3_BY_2 * 0.95);
-	} break;
-
-	case MC_AUDIO_SAMPLED: {
-		const int8_t *table = audio->sample_table[audio->sample_table_now];
-
-		if (!table || !audio->sample_table_filled[audio->sample_table_now]) {
-			break;
-		}
-
-		float sample = (float)table[(int)floorf(audio->sample_pos)] / 128.0 * audio->sample_voltage;
-
-		audio->sample_pos += dt * audio->sample_freq;
-		if (floorf(audio->sample_pos) >= audio->sample_table_len[audio->sample_table_now]) {
-			audio->sample_pos -= audio->sample_table_len[audio->sample_table_now];
-			audio->sample_table_filled[audio->sample_table_now] = false;
-			audio->sample_table_now++;
-			if (audio->sample_table_now > 1) {
-				audio->sample_table_now = 0;
-			}
-		}
-
-		state_m->mod_alpha_raw += -s * sample;
-		state_m->mod_beta_raw  += c * sample;
-		utils_saturate_vector_2d((float*)&state_m->mod_alpha_raw, (float*)&state_m->mod_beta_raw, SQRT3_BY_2 * 0.95);
-	} break;
-
-	default:
-		break;
-
-	}
 
 	// HFI
 	if (do_hfi) {

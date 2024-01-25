@@ -558,7 +558,7 @@ static void adc_int_handler(void *p, uint32_t flags) {
 
 		if ((wrong_voltage_iterations >= 8)) {
 			mc_interface_fault_stop(input_voltage < m_conf->l_min_vin ?
-					FAULT_CODE_UNDER_VOLTAGE : FAULT_CODE_OVER_VOLTAGE, false, true);
+					FAULT_CODE_UNDER_VOLTAGE : FAULT_CODE_OVER_VOLTAGE, false, true);  //过压或欠压错误
 		}
 	} else {
 		wrong_voltage_iterations = 0;

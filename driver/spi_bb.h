@@ -35,7 +35,7 @@ typedef struct {
 	stm32_gpio_t *miso_gpio;
 	int miso_pin;
 	mutex_t mutex;
-} spi_bb_state;
+} spi_bb_state;  //4个SPI端口的定义 初始化用的结构体
 
 void spi_bb_init(spi_bb_state *s);
 void spi_bb_deinit(spi_bb_state *s);

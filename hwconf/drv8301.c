@@ -46,7 +46,7 @@ static void terminal_print_faults(int argc, const char **argv);
 static char m_fault_print_buffer[120];
 static mutex_t m_spi_mutex;
 
-void drv8301_init(void) {
+void drv8301_init(void) {         //DRV初始化，只有通信部分
 	chMtxObjectInit(&m_spi_mutex);
 
 	// DRV8301 SPI

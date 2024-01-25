@@ -1,3 +1,4 @@
+
 /*
 	Copyright 2016 - 2022 Benjamin Vedder	benjamin@vedder.se
 	Copyright 2022 Jakub Tomczak
@@ -33,6 +34,17 @@
 #include "enc_sincos.h"
 #include "enc_tle5012.h"
 #include "enc_ts5700n8501.h"
+
+#if defined (USE_CUSTOM_ENCODER1)
+#if defined (HW_IS_LIMITI_MK1) 
+extern bool find_index;
+extern bool motor_stop;  //custom编码器标志位
+//自定义编码器回调函数
+float custom_as5047_read_deg (void);
+bool custom_as5047_fault_check(void);
+char* custom_as5047_print_info(void);
+#endif
+#endif
 
 // Functions
 bool encoder_init(volatile mc_configuration *conf);

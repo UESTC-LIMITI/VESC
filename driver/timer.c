@@ -44,7 +44,7 @@ uint32_t timer_time_now(void) {
 	return TIM5->CNT;
 }
 
-float timer_seconds_elapsed_since(uint32_t time) {
+float timer_seconds_elapsed_since(uint32_t time) {  //一般计时用timer5
 	uint32_t diff = TIM5->CNT - time;
 	return (float)diff / (float)TIMER_HZ;
 }

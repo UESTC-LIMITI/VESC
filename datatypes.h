@@ -24,6 +24,20 @@
 #include <stdbool.h>
 #include "ch.h"
 
+#if defined(SHOOT_TEST) //SHOOT_TEST的CUSTOM_MODE定义
+#define SEND_NUM 3000
+typedef enum {
+	CUSTOM_MODE_NONE = 0,
+	CUSTOM_MODE_1,
+	CUSTOM_MODE_2,
+	CUSTOM_MODE_3,
+	CUSTOM_MODE_4,
+	CUSTOM_MODE_5,
+	CUSTOM_MODE_6,
+	CUSTOM_MODE_7,
+} CUSTOM_MODE;
+#endif
+
 // Data types
 typedef enum {
 	HW_TYPE_VESC = 0,
@@ -300,7 +314,6 @@ typedef struct {
 	float temps_adc[50];
 	float temp_ic;
 	float temp_hum;
-	float pressure;
 	float hum;
 	float temp_max_cell;
 	float soc;
@@ -428,9 +441,9 @@ typedef struct {
 	bool foc_encoder_inverted;
 	float foc_encoder_ratio;
 	float foc_motor_l;
-	float foc_motor_ld_lq_diff;
+	float foc_motor_ld_lq_diff;  //ld-lq diff 整定可得 
 	float foc_motor_r;
-	float foc_motor_flux_linkage;
+	float foc_motor_flux_linkage;    //磁通量
 	float foc_observer_gain;
 	float foc_observer_gain_slow;
 	float foc_observer_offset;
@@ -1095,13 +1108,6 @@ typedef enum {
 	COMM_LOG_DATA_F64						= 151,
 
 	COMM_LISP_RMSG							= 152,
-
-	//Placeholders for pinlock commands
-	//COMM_PINLOCK1							= 153,
-	//COMM_PINLOCK2							= 154,
-	//COMM_PINLOCK3							= 155,
-
-	COMM_SHUTDOWN							= 156,
 } COMM_PACKET_ID;
 
 // CAN commands
@@ -1169,6 +1175,19 @@ typedef enum {
 	CAN_PACKET_GNSS_LAT						= 60,
 	CAN_PACKET_GNSS_LON						= 61,
 	CAN_PACKET_GNSS_ALT_SPEED_HDOP			= 62,
+#if defined(SHOOT_TEST)  //SHOOT_TEST消息解码枚举体
+	CAN_PACKET_SET_ACCEL_CURRENT			= 63,
+	CAN_PACKET_SET_LIMIT_SPEED				= 64,
+	CAN_PACKET_SET_TARGET_SPEED				= 65,
+	CAN_PACKET_SET_LIMIT_POS				= 66,
+	CAN_PACKET_SET_SAMPLE_POINTS			= 67,
+	CAN_PACKET_SET_BRAKE_CURRENT			= 68,
+	CAN_PACKET_SET_CUSTOM_MODE				= 69,
+	CAN_PACKET_ALIVE						= 70,
+	CAN_PACKET_SET_RESET_SPEED				= 71,
+	CAN_PACKET_SET_RESET_POS_SAMPLE_POINTS	= 72,
+	CAN_PACKET_SET_TARGET_DUTY				= 73,
+#endif
 	CAN_PACKET_MAKE_ENUM_32_BITS = 0xFFFFFFFF,
 } CAN_PACKET_ID;
 

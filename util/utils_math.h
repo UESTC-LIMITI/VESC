@@ -55,19 +55,19 @@ uint16_t utils_median_filter_uint16_run(uint16_t *buffer,
 void utils_rotate_vector3(float *input, float *rotation, float *output, bool reverse);
 
 // Return the sign of the argument. -1.0 if negative, 1.0 if zero or positive.
-#define SIGN(x)				(((x) < 0.0) ? -1.0 : 1.0)
+#define SIGN(x)				(((x) < 0.0) ? -1.0 : 1.0)  //取符号，0取正号
 
 // Squared
 #define SQ(x)				((x) * (x))
 
 // Two-norm of 2D vector
 //#define NORM2(x,y)		(sqrt(SQ(x) + SQ(y)))
-#define NORM2_f(x,y)		(sqrtf(SQ(x) + SQ(y)))
+#define NORM2_f(x,y)		(sqrtf(SQ(x) + SQ(y)))  //求模
 
 // nan and infinity check for floats
 #define UTILS_IS_INF(x)		((x) == (1.0 / 0.0) || (x) == (-1.0 / 0.0))
 #define UTILS_IS_NAN(x)		((x) != (x))
-#define UTILS_NAN_ZERO(x)	(x = UTILS_IS_NAN(x) ? 0.0 : x)
+#define UTILS_NAN_ZERO(x)	(x = UTILS_IS_NAN(x) ? 0.0 : x)  //检测浮点数有没有溢出啥的？
 
 // Handy conversions for radians/degrees and RPM/radians-per-second
 #define DEG2RAD_f(deg) ((deg) * (float)(M_PI / 180.0))
@@ -97,7 +97,7 @@ void utils_rotate_vector3(float *input, float *rotation, float *output, bool rev
  * @param filter_constant
  * Filter constant. Range 0.0 to 1.0, where 1.0 gives the unfiltered value.
  */
-#define UTILS_LP_FAST(value, sample, filter_constant)	(value -= (filter_constant) * ((value) - (sample)))
+#define UTILS_LP_FAST(value, sample, filter_constant)	(value -= (filter_constant) * ((value) - (sample)))  //简易低通滤波
 
 /**
  * A fast approximation of a moving average filter with N samples. See

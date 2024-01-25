@@ -227,7 +227,7 @@ void mcpwm_init(volatile mc_configuration *configuration) {
 	filter_create_fir_lowpass((float*)current_fir_coeffs, CURR_FIR_FCUT, CURR_FIR_TAPS_BITS, 1);
 
 	TIM_DeInit(TIM1);
-	TIM_DeInit(TIM8);
+	TIM_DeInit(TIM8);//清空定时器初始化状态
 	TIM1->CNT = 0;
 	TIM8->CNT = 0;
 
@@ -239,16 +239,16 @@ void mcpwm_init(volatile mc_configuration *configuration) {
 	TIM_TimeBaseStructure.TIM_ClockDivision = 0;
 	TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;
 
-	TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure);
+	TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure);  //使能、配置、初始化
 
 	// Channel 1, 2 and 3 Configuration in PWM mode
-	TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
+	TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;    //输出比较模式 PWM
 	TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
 	TIM_OCInitStructure.TIM_OutputNState = TIM_OutputNState_Enable;
 	TIM_OCInitStructure.TIM_Pulse = TIM1->ARR / 2;
 
 #ifndef INVERTED_TOP_DRIVER_INPUT
-	TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High; // gpio high = top fets on
+	TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High; // gpio high = top fets on  //基准电平为高电平，可以反转
 #else
 	TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_Low;
 #endif
@@ -264,7 +264,7 @@ void mcpwm_init(volatile mc_configuration *configuration) {
 	TIM_OC1Init(TIM1, &TIM_OCInitStructure);
 	TIM_OC2Init(TIM1, &TIM_OCInitStructure);
 	TIM_OC3Init(TIM1, &TIM_OCInitStructure);
-	TIM_OC4Init(TIM1, &TIM_OCInitStructure);
+	TIM_OC4Init(TIM1, &TIM_OCInitStructure);   //四个通道都是相同配置
 
 	TIM_OC1PreloadConfig(TIM1, TIM_OCPreload_Enable);
 	TIM_OC2PreloadConfig(TIM1, TIM_OCPreload_Enable);

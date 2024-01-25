@@ -142,7 +142,7 @@ typedef struct {
 	uint32_t exti_ch;
 
 	ABI_state state;
-} ABI_config_t;
+} ABI_config_t;   //ABI编码器设置结构体
 
 typedef struct {
 	uint32_t signal_below_min_error_cnt;
@@ -220,13 +220,13 @@ typedef struct {
 	uint32_t spi_error_cnt;
 	float spi_error_rate;
 	uint32_t last_update_time;
-} AS504x_state;
+} AS504x_state;   ///AS5047相关结构体 包含了各种读取角度
 
 typedef struct {
 	spi_bb_state sw_spi;
 	AS504x_state state;
-} AS504x_config_t;
-
+} AS504x_config_t;   //AS5047 初始化用的结构体
+ 
 typedef struct {
 	uint8_t is_connected;
 	uint8_t is_broken_hall;

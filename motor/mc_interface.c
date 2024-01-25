@@ -156,7 +156,7 @@ static thread_t *fault_stop_tp;
 static THD_WORKING_AREA(stat_thread_wa, 512);
 static THD_FUNCTION(stat_thread, arg);
 
-void mc_interface_init(void) {
+void mc_interface_init(void) {   //上位机与下位机交互的init？
 	memset((void*)&m_motor_1, 0, sizeof(motor_if_state_t));
 #ifdef HW_HAS_DUAL_MOTORS
 	memset((void*)&m_motor_2, 0, sizeof(motor_if_state_t));
@@ -301,7 +301,7 @@ const volatile mc_configuration* mc_interface_get_configuration(void) {
 	return &motor_now()->m_conf;
 }
 
-void mc_interface_set_configuration(mc_configuration *configuration) {
+void mc_interface_set_configuration(mc_configuration *configuration) {   //更新自己的电机设置
 	volatile motor_if_state_t *motor = motor_now();
 
 #if defined HW_HAS_DUAL_PARALLEL

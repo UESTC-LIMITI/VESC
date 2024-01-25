@@ -72,7 +72,7 @@ void shutdown_hold(bool hold) {
 	m_shutdown_hold = hold;
 }
 
-bool do_shutdown(bool resample) {
+static bool do_shutdown(void) {
 	conf_general_store_backup_data();
 #ifdef USE_LISPBM
 	lispif_process_shutdown();
@@ -83,19 +83,9 @@ bool do_shutdown(bool resample) {
 		chThdSleepMilliseconds(5);
 	}
 
-	bool disable_gates = true;
-	if (resample) {
-		chMtxLock(&m_sample_mutex);
-		if (!m_sampling_disabled) {
-			disable_gates = HW_SAMPLE_SHUTDOWN();
-		}
-		chMtxUnlock(&m_sample_mutex);
-	}
-	if (disable_gates) {
-		DISABLE_GATE();
-		HW_SHUTDOWN_HOLD_OFF();
-	}
-	return disable_gates;
+	DISABLE_GATE();
+	HW_SHUTDOWN_HOLD_OFF();
+	return true;
 }
 
 static THD_FUNCTION(shutdown_thread, arg) {
@@ -134,7 +124,7 @@ static THD_FUNCTION(shutdown_thread, arg) {
 		switch (conf->shutdown_mode) {
 		case SHUTDOWN_MODE_ALWAYS_OFF:
 			if (m_button_pressed) {
-				gates_disabled_here = do_shutdown(true);
+				gates_disabled_here = do_shutdown();
 			}
 			break;
 
@@ -156,7 +146,7 @@ static THD_FUNCTION(shutdown_thread, arg) {
 
 		default:
 			if (clicked) {
-				gates_disabled_here = do_shutdown(false);
+				gates_disabled_here = do_shutdown();
 			}
 			break;
 		}
@@ -189,7 +179,7 @@ static THD_FUNCTION(shutdown_thread, arg) {
 			}
 
 			if (m_inactivity_time >= shutdown_timeout && m_button_pressed) {
-				gates_disabled_here = do_shutdown(false);
+				gates_disabled_here = do_shutdown();
 			}
 		}
 
@@ -221,11 +211,6 @@ float shutdown_get_inactivity_time(void) {
 
 void shutdown_hold(bool hold) {
 	(void)hold;
-}
-
-bool do_shutdown(bool resample) {
-	(void)resample;
-	return false;
 }
 
 static THD_FUNCTION(shutdown_thread, arg) {

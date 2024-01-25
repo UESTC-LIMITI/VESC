@@ -44,17 +44,6 @@
 #define PHASE_FILTER_ON()		palSetPad(PHASE_FILTER_GPIO, PHASE_FILTER_PIN)
 #define PHASE_FILTER_OFF()		palClearPad(PHASE_FILTER_GPIO, PHASE_FILTER_PIN)
 
-// Shutdown pin
-#define HW_SHUTDOWN_GPIO		GPIOC
-#define HW_SHUTDOWN_PIN			5
-#define HW_SHUTDOWN_HOLD_ON()	palSetPad(HW_SHUTDOWN_GPIO, HW_SHUTDOWN_PIN)
-#define HW_SHUTDOWN_HOLD_OFF()	palClearPad(HW_SHUTDOWN_GPIO, HW_SHUTDOWN_PIN)
-#define HW_SAMPLE_SHUTDOWN()	hw_sample_shutdown_button()
-
-// Hold shutdown pin early to wake up on short pulses
-#define HW_EARLY_INIT()			palSetPadMode(HW_SHUTDOWN_GPIO, HW_SHUTDOWN_PIN, PAL_MODE_OUTPUT_PUSHPULL); \
-								HW_SHUTDOWN_HOLD_ON();      
-
 //#define AUX_GPIO				GPIOC
 //#define AUX_PIN					12
 //#define AUX_ON()				palSetPad(AUX_GPIO, AUX_PIN)
@@ -76,7 +65,7 @@
  * 7  (2):	IN6		ADC_EXT2
  * 8  (3):	IN3		TEMP_MOS
  * 9  (1):	IN14	TEMP_MOTOR
- * 10 (2):	IN15	SHUTDOWN
+ * 10 (2):	IN15	ADC_EXT3
  * 11 (3):	IN13	AN_IN
  * 12 (1):	Vrefint
  * 13 (2):	IN0		SENS1
@@ -100,7 +89,7 @@
 #define ADC_IND_VIN_SENS		11
 #define ADC_IND_EXT				6
 #define ADC_IND_EXT2			7
-#define ADC_IND_SHUTDOWN		10
+#define ADC_IND_EXT3			10
 #define ADC_IND_TEMP_MOS		8
 #define ADC_IND_TEMP_MOS_2		15
 #define ADC_IND_TEMP_MOS_3		16
@@ -285,5 +274,5 @@
 
 // HW-specific functions
 float hw84_100_get_temp(void);
-bool hw_sample_shutdown_button(void);
+
 #endif /* HW_MKSESC_84_100_HP_H_ */

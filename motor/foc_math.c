@@ -526,7 +526,7 @@ float foc_correct_encoder(float obs_angle, float enc_angle, float speed,
 	float rpm_abs = fabsf(RADPS2RPM_f(speed));
 
 	// Hysteresis 5 % of total speed
-	float hyst = sl_erpm * 0.05;
+	float hyst = sl_erpm * 0.05;  //速度读取滞后？
 	if (motor->m_using_encoder) {
 		if (rpm_abs > (sl_erpm + hyst)) {
 			motor->m_using_encoder = false;

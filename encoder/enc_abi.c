@@ -19,6 +19,7 @@
  */
 
 #include "encoder/enc_abi.h"
+#include "encoder.h"
 
 #include "ch.h"
 #include "hal.h"
@@ -30,14 +31,14 @@
 #include <string.h>
 #include <math.h>
 
-bool enc_abi_init(ABI_config_t *cfg) {
+bool enc_abi_init(ABI_config_t *cfg) {  //ABI编码器初始化
 	EXTI_InitTypeDef EXTI_InitStructure;
 
 	memset(&cfg->state, 0, sizeof(ABI_state));
 
-	palSetPadMode(cfg->A_gpio, cfg->A_pin, PAL_MODE_ALTERNATE(cfg->tim_af));
+	palSetPadMode(cfg->A_gpio, cfg->A_pin, PAL_MODE_ALTERNATE(cfg->tim_af));  
 	palSetPadMode(cfg->B_gpio, cfg->B_pin, PAL_MODE_ALTERNATE(cfg->tim_af));
-	palSetPadMode(cfg->I_gpio, cfg->I_pin, PAL_MODE_INPUT_PULLUP);
+	palSetPadMode(cfg->I_gpio, cfg->I_pin, PAL_MODE_INPUT_PULLUP);  //引脚配置 I口要上拉输入
 
 	// Enable timer clock
 	HW_ENC_TIM_CLK_EN();
@@ -46,7 +47,7 @@ bool enc_abi_init(ABI_config_t *cfg) {
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
 
 	TIM_EncoderInterfaceConfig(cfg->timer,
-			TIM_EncoderMode_TI12, TIM_ICPolarity_Rising, TIM_ICPolarity_Rising);
+			TIM_EncoderMode_TI12, TIM_ICPolarity_Rising, TIM_ICPolarity_Rising);  //直接使用定时器编码器模式来读，应该和SPI没有冲突
 	TIM_SetAutoreload(cfg->timer, cfg->counts - 1);
 
 	// Filter
@@ -58,7 +59,7 @@ bool enc_abi_init(ABI_config_t *cfg) {
 	// Interrupt on index pulse
 
 	// Connect EXTI Line to pin
-	SYSCFG_EXTILineConfig(cfg->exti_portsrc, cfg->exti_pinsrc);
+	SYSCFG_EXTILineConfig(cfg->exti_portsrc, cfg->exti_pinsrc);  
 
 	// Configure EXTI Line
 	EXTI_InitStructure.EXTI_Line = cfg->exti_line;
@@ -68,7 +69,7 @@ bool enc_abi_init(ABI_config_t *cfg) {
 	EXTI_Init(&EXTI_InitStructure);
 
 	// Enable and set EXTI Line Interrupt to the highest priority
-	nvicEnableVector(cfg->exti_ch, 0);
+	nvicEnableVector(cfg->exti_ch, 0);  //外部中断来记录I端脉冲？
 
 	return true;
 }
@@ -81,7 +82,7 @@ void enc_abi_deinit(ABI_config_t *cfg) {
 	palSetPadMode(cfg->I_gpio, cfg->I_pin, PAL_MODE_INPUT_PULLUP);
 }
 
-float enc_abi_read_deg(ABI_config_t *cfg) {
+float enc_abi_read_deg(ABI_config_t *cfg) {   //读ABI编码器角度的函数
 	return ((float)cfg->timer->CNT * 360.0) / (float)cfg->counts;
 }
 
@@ -102,7 +103,7 @@ void enc_abi_pin_isr(ABI_config_t *cfg) {
 				cfg->timer->CNT = 0;
 				cfg->state.bad_pulses = 0;
 			} else {
-				cfg->state.bad_pulses++;
+				cfg->state.bad_pulses++;  //一次采样就转了1/20圈，误差太大，应该是坏的数据
 
 				if (cfg->state.bad_pulses > 5) {
 					cfg->state.index_found = 0;
@@ -114,4 +115,13 @@ void enc_abi_pin_isr(ABI_config_t *cfg) {
 			cfg->state.bad_pulses = 0;
 		}
 	}
+
+#if defined (USE_CUSTOM_ENCODER1)
+#if defined (HW_IS_LIMITI_MK1) 
+	if(find_index == false) {  //更新标志位 自定义编码器用
+		find_index = true;
+		motor_stop = false;
+	}
+#endif
+#endif
 }

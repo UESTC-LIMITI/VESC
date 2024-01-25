@@ -1,4 +1,3 @@
-
 /*
     Copyright 2018 , 2022 Joel Svensson        svenssonjoel@yahoo.se
 
@@ -522,11 +521,11 @@ lbm_value lbm_list_destructive_reverse(lbm_value list);
  * \warning This is a dangerous function that should be used carefully. Cyclic structures on the heap
  * may lead to the function not terminating.
  *
- * \param m Number of elements to copy or -1 for all. If 1, m will be updated with the length of the list
+ * \param m Number of elements to copy or -1 for all.
  * \param list A list.
  * \return Reversed list or enc_sym(SYM_MERROR) if heap is full.
  */
-lbm_value lbm_list_copy(int *m, lbm_value list);
+lbm_value lbm_list_copy(int m, lbm_value list);
 
 /** A destructive append of two lists
  *
@@ -622,16 +621,11 @@ int lbm_lift_array(lbm_value *value, char *data, lbm_uint num_elt);
  * \return -1 for failure or length of array.
  */
 lbm_int lbm_heap_array_get_size(lbm_value arr);
-/** Get a pointer to the data of an array for read only purposes.
+/** Get a pointer to the data of an array.
  * \param arr lbm_value array to get pointer from.
  * \return NULL or valid pointer.
  */
-const uint8_t *lbm_heap_array_get_data_ro(lbm_value arr);
-/** Get a pointer to the data of an array for read/write purposes.
- * \param arr lbm_value array to get pointer from.
- * \return NULL or valid pointer.
- */
-uint8_t *lbm_heap_array_get_data_rw(lbm_value arr);
+uint8_t *lbm_heap_array_get_data(lbm_value arr);
 /** Explicitly free an array.
  *  This function needs to be used with care and knowledge.
  * \param arr Array value.

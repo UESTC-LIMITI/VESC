@@ -2,9 +2,9 @@
 
 ## About Symbols
 
-Symbols are very important and central to LispBM and also perhaps
+Symbols are very important and fundamental to LispBM and also perhaps
 a bit different from identifiers/names used in languages such as C, so
-a short intro on symbols could be good here.
+a short intro could be good here.
 
 A symbol can be thought of as a name and can be used to give names
 to functions or values (variables). A symbol can also be treated and
@@ -28,39 +28,21 @@ all integer comparisons.
 
 You associate values with symbols using, <a href="#define">define</a>,
 <a href="#let">let</a> and you can change the value bound to a "variable"
-using <a href="#set">set</a>, <a href="#setvar">setq</a> or <a href="#setvar">setvar</a>.
+using <a href="#setvar">setvar</a>
 
 Not all symbols are treated the same in LBM. Some symbols are treated as
 special because of their very fundamental nature. Among these special symbols
 you find `define`, `let` and `lambda` for example. These are things that you
 should not be able to redefine and trying to redefine them leads to an error.
-Symbols that start with `ext-` are special and reserved for use together
-with extensions that are loaded and bound at runtime.
+There are two classes of symbols that are special by naming convention and
+these either start with a `#`, for fast-lookup variables, and `ext-` for
+extensions that will be bound at runtime.
 
-Examples of symbols used as data are `nil` and `t`. `nil` representds
-"nothing", the empty list or other similar things and `t`
+Examples of symbols used as data are `nil` and `t`. `nil` is used the
+represent nothing, the empty list or other similar things and `t`
 represents true.  But any symbol can be used as data by quoting it
 `'`, see <a href="#quotes-and-quasiquotation"> Quotes and
 Quasiquotation </a>.
-
-### Valid symbol names
-
-A symbol is a string of characters following the rules:
-1. The first character is a one of 'a' - 'z' or 'A' - 'Z' or '+-*/=<>#!'.
-2. The rest of the characters are in 'a' - 'z' or 'A' - 'Z' or '0' - '9' or '+-*/=<>!?_'.
-3. At most 256 characters long.
-
-Note that lower-case and upper-case alphabetical letters are considered identical
-so the symbol `apa` is the same symbol as `APA`.
-
-examples of valid symbols
-```
-apa
-apa?
-!apa
-kurt_russel_is_great
-```
-
 
 
 ## Arithmetic
@@ -386,7 +368,7 @@ the argument.
 ### nil
 
 Represents the empty list. The nil value is also considered to be false by
-conditionals.
+conditionals
 
 The example below creates a one element list by allocating a cons cell and putting a value (1) in the <a href="#car"> car </a> field
 and nil in the <a href="#cdr"> cdr </a> field.
@@ -418,7 +400,7 @@ explicit true makes sense.
 ## Quotes and Quasiquotation
 
 Code and data share the same representation, it is only a matter of how
-you look at it. The tools for changing view, or interpretation,  are the quotation and
+you look at it. The tools for changing how your view are the quotation and
 quasiquotation operations.
 
 ---
@@ -756,9 +738,9 @@ Example
 ### setvar
 
 The `setvar` form is used to change the value of some variable in an environment.
-You can use `setvar` to change the value of a global definition or a local definition.
-An application of the `setvar` form looks like `(setvar var-expr val-expr)` where
-`var-expr` should evaluate to a symbol. The `val-expr` is evaluated before
+You can use `setvar` to change the value of a global definition, a local definition
+or a variable defintion (`#var`). An application of the `setvar` form looks like
+`(setvar var-expr val-expr)` where `var-expr` should evaluate to a symbol. The `val-expr` is evaluated before
 rebinding the variable. `setvar` returns the value that `val-expr` evaluates to.
 
 Examples:
@@ -778,6 +760,15 @@ You can also set the value of a let bound variable.
 ```clj
 (let ((a 10)) (setvar 'a 20))
 ```
+
+And you can change the value of a `#var`.
+
+```clj
+(define #a 10)
+
+(setvar '#a 20)
+```
+`#a` is now 20.
 
 ---
 
@@ -874,6 +865,7 @@ These two programs are thus equivalent:
   (define a 10)
   (define b 20)
   (+ a b))
+
 ```
 
 And
@@ -950,7 +942,7 @@ The code above evaluates to 11.
 
 <a name="read-program"> <h3>read-program</h3> </a>
 
-Parses a string containing multiple sequenced expressions. The resulting list of
+Parses a string containing multiple sequenced expressed. The resulting list of
 expressions can be evaluated as a program using <a href="#eval-program">eval-program</a>.
 The form of a read-program expression is `(read-program string)`.
 
@@ -1169,7 +1161,7 @@ Example that combines to lists.
 
 ### ix
 
-Index into a list using the `ix` function. The form of an `ix` expression
+Index into a list using the `ix`. the form of an `ix` expression
 is `(ix list-expr index-expr)`. Indexing starts from 0 and if you index out of bounds the result is nil.
 
 Example that evaluates to 2.
@@ -1258,44 +1250,6 @@ Here `(drop ls 5)` evaluates to the list `(6 7 8 9 10)`.
 
 ---
 
-### Merge
-
-
-`merge` merges two lists that are ordered according to a comparator into
-a single ordered list. The form of a `merge` expression is `(merge comparator-exp list-exp1 list-exp2)`.
-
-Example:
-```clj
-(define a '(2 4 6 8 10 12))
-(define b '(1 3 5))
-
-(merge < a b)
-```
-
-Here `(merge < a b)` evaluates to the list `(1 2 3 4 5 6 8 10 12)`.
-
----
-
-### Sort
-
-`sort` orders a list of values according to a comparator. The sorting
-algorithm used is an in-place merge-sort. A copy of the input list is created
-at the beginning of the sort to provide a functional interface from the user's
-point of view. The form of a sort expression is `(sort comparator-exp list-exp)`
-
-Example:
-```clj
-(define ls '( 1 9 2 5 1 8 3))
-
-(sort < ls)
-
-```
-
-Here `(sort < ls)` evaluates to the list `(1 1 2 3 5 8 9)`.
-
----
-
-
 ## Associations lists (alists)
 
 Association lists (alists) are, just like regular lists, built out
@@ -1364,9 +1318,9 @@ alist. The form of a `setassoc` expression is `(setassoc alist-expr key-expr val
 ### bufcreate
 
 Create an array of bytes. The
-form of a `bufcreate` expression is `(bufcreate size-expr)`
+form of an `bufcreate` expression is `(bufcreate size-expr)`
 
-Example that creates a 10 element buffer called data:
+Example that creates a 10 element buffer caled data:
 
 ```clj
 (define data (bufcreate 10))
@@ -1671,21 +1625,19 @@ An example that atomically perfoms operations a,b and c.
 
 ### exit-ok
 
-The `exit-ok` function terminates the thread in a "successful" way and
-returnes a result specified by the programmer. The form of an
-`exit-ok` expression is `(exit-ok value)`.  If the process that calls
-`exit-ok` was created using `spawn-trap` a message of the form
+The `exit-ok` function terminates the thread in a "successful" way and returnes a result
+specified by the programmer. The form of an `exit-ok` expression is `(exit-ok value)`.
+If the process that calls `exit-ok` was created using `spawn-trap` a message of the form
 `(exit-ok tid value)` is be sent to the parent of this process.
 
 ---
 
 ### exit-error
 
-The `exit-error` function terminates the thread with an error
-specified by the programmer.  The form of an `exit-error` expression
-is `(exit-error err_val)`. If the process that calls `exit-error` was
-created using `spawn-trap` a message of the form `(exit-error tid
-err_val)` is sent to the parent of this process.
+The `exit-error` function terminates the thread with an error specified by the programmer.
+The form of an `exit-error` expression is `(exit-error err_val)`. If the process that
+calls `exit-error` was created using `spawn-trap` a message of the form
+`(exit-error tid err_val)` is sent to the parent of this process.
 
 ---
 

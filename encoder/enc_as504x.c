@@ -65,9 +65,9 @@ static uint8_t AS504x_spi_transfer_err_check(spi_bb_state *sw_spi,
 		uint16_t *in_buf, const uint16_t *out_buf, int length);
 static void AS504x_determinate_if_connected(AS504x_config_t *cfg, bool was_last_valid);
 
-bool enc_as504x_init(AS504x_config_t *cfg) {
+bool enc_as504x_init(AS504x_config_t *cfg) {   //AS5047初始化函数
 	memset(&cfg->state, 0, sizeof(AS504x_state));
-	spi_bb_init(&(cfg->sw_spi));
+	spi_bb_init(&(cfg->sw_spi));   
 	return true;
 }
 
@@ -77,16 +77,16 @@ void enc_as504x_deinit(AS504x_config_t *cfg) {
 	cfg->state.spi_error_rate = 0.0;
 }
 
-void enc_as504x_routine(AS504x_config_t *cfg) {
+void enc_as504x_routine(AS504x_config_t *cfg) {   //AS5047的SPI通信整个流程  纯纯SPI通信
 	uint16_t pos;
 
 	float timestep = timer_seconds_elapsed_since(cfg->state.last_update_time);
 	if (timestep > 1.0) {
 		timestep = 1.0;
 	}
-	cfg->state.last_update_time = timer_time_now();
+	cfg->state.last_update_time = timer_time_now();  //用timer5简单的计时
 
-	// if MOSI is defined, use diagnostics
+	// if MOSI is defined, use diagnostics  //还可以有通信呢
 	if (cfg->sw_spi.mosi_gpio != 0) {
 		spi_bb_begin(&(cfg->sw_spi));
 		spi_bb_transfer_16(&(cfg->sw_spi), 0, 0, 1);

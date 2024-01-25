@@ -234,7 +234,6 @@ Get value from BMS. Examples:
 (get-bms-val 'bms-temp-ic) ; Balance IC temperature
 (get-bms-val 'bms-temp-hum) ; Humidity sensor temperature
 (get-bms-val 'bms-hum) ; Humidity
-(get-bms-val 'bms-pres) ; Pressure in PA (Added in 6.05)
 (get-bms-val 'bms-temp-cell-max) ; Maximum cell temperature
 (get-bms-val 'bms-soc) ; State of charge (0.0 to 1.0)
 (get-bms-val 'bms-can-id) ; CAN ID of BMS
@@ -243,7 +242,6 @@ Get value from BMS. Examples:
 (get-bms-val 'bms-ah-cnt-dis-total) ; Total ah discharged
 (get-bms-val 'bms-wh-cnt-dis-total) ; Total wh discharged
 (get-bms-val 'bms-msg-age) ; Age of last message from BMS in seconds
-(get-bms-val 'bms-chg-allowed) ; Charging allowed (Added in 6.05, Express only)
 ```
 
 ---
@@ -282,34 +280,6 @@ Example:
 ```
 
 Send BMS-values on CAN-bus. This his useful if a custom BMS-driver is implemented using [set-bms-val](#set-bms-val) in order to make devices on the CAN-bus aware of the BMS-state using the VESC protocol.
-
----
-
-#### set-bms-chg-allowed
-
-| Platforms | Firmware |
-|---|---|
-| ESC, Express | 6.05+ |
-
-```clj
-(set-bms-chg-allowed allow)
-```
-
-Enable or disable charging. 1 means enable and 0 means disable.
-
----
-
-#### bms-force-balance
-
-| Platforms | Firmware |
-|---|---|
-| ESC, Express | 6.05+ |
-
-```clj
-(bms-force-balance balance)
-```
-
-Start or stop balancing. 1 means start and 0 means stop.
 
 ---
 
@@ -1052,50 +1022,6 @@ Run FOC in open loop. Useful to test thermal properties of motors and power stag
 ```
 
 Use the motor to play a beep sound at frequency freq for time seconds using voltage excitation voltage. The frequency can be set between 100 Hz and 7500 Hz.
-
----
-
-#### foc-play-tone
-
-| Platforms | Firmware |
-|---|---|
-| ESC | 6.05+ |
-
-```clj
-(foc-play-tone channel freq voltage)
-```
-
-Use the motor to play a tone at frequency freq with modulation voltage. Channel can be 0, 1, 2 or 3 and all channels can play tones simultaneously (polyphonic audio). Unlike foc-beep, foc-play-tone also works while the motor is running.
-
----
-
-#### foc-play-samples
-
-| Platforms | Firmware |
-|---|---|
-| ESC | 6.05+ |
-
-```clj
-(foc-play-samples samples freq voltage)
-```
-
-Use the motor to play sampled audio. Works while the motor is running. Samples is a byte-array with samples, where each sample has the range -128 to 127. Freq is the sampling frequency and voltage is the voltage amplitude the samples will be played at.
-
-The caller is responsible for making sure that the sample buffer stays valid until it is consumed. Internally this function has two buffers and when both buffers are full the function will block until a buffer is free. For smooth playback, it is important to keep feeding this function with buffers faster than it consumes the samples.
-
----
-
-#### foc-play-stop
-
-| Platforms | Firmware |
-|---|---|
-| ESC | 6.05+ |
-
-```clj
-(foc-play-stop)
-```
-
-Stop playing tones on all channels.
 
 ---
 
@@ -2438,49 +2364,13 @@ Get the absolute value of x.
 
 | Platforms | Firmware |
 |---|---|
-| ESC, Express | 6.00+ |
+| ESC | 6.00+ |
 
 ```clj
 (throttle-curve value accel brake mode)
 ```
 
 Apply throttle curve on value. accel (range -1 to 1) is the curve constant for acceleration (when value is greater than 0) and brake (range -1 to 1) is the curve constant for braking (when value is less than 0). mode (0, 1 or 2) is the throttle curve mode. Negative curve constants mean that the throttle will be gentler in the beginning and more aggressive with towards the end and positive curve constants mean the opposite. The modes are 0: Exponential, 1: Natural and 2: Polynomial. You can have a look at the throttle curves in VESC Tool for the PPM, ADC or VESC Remote app and experiment with the mode and curve constants to see a plot of the response.
-
----
-
-#### rand
-
-| Platforms | Firmware |
-|---|---|
-| ESC, Express | 6.05+ |
-
-```clj
-(rand optSeed)
-```
-
-Generate random number in the range 0 to (rand-max). Example:
-
-```clj
-; Generate integer in the range 0 to 99
-(mod (rand) 100)
-
-; Generate number in the range 0.0 to 1.0
-(/ (to-float (rand)) (rand-max))
-```
-
----
-
-#### rand-max
-
-| Platforms | Firmware |
-|---|---|
-| ESC, Express | 6.05+ |
-
-```clj
-(rand-max)
-```
-
-Returns the maximum number that rand can return.
 
 ---
 
@@ -3971,7 +3861,7 @@ Sort list lst using comparison function f. Example:
 > ("a" "is" "string" "this")
 ```
 
-Note: Sort is quite slow the way it is implemented now. If sorting becomes a bottleneck in your application you can open an issue on github and hopefully someone will look into that and make a fast implementation. **Update**: Since firmware 6.05 sort is a built-in function that uses the merge sort algorithm. That makes it fast and it works well on large lists.
+Note: Sort is quite slow the way it is implemented now. If sorting becomes a bottleneck in your application you can open an issue on github and hopefully someone will look into that and make a fast implementation.
 
 ---
 
@@ -4582,7 +4472,7 @@ The last byte in `seq` will be ignored as that is the null-terminator if `seq` i
 | ESC, Express | 6.05+ |
 
 ```clj
-(buf-resize arr delta-size opt-absolute-size opt-copy-symbol)
+(buf-resize arr delta-size opt-absolute-size)
 ```
 
 Change the length of array `arr` in bytes. A reference to `arr` is returned.
@@ -4597,14 +4487,6 @@ This extension can be used in two modes:
 Passing `nil` to `delta-size` while not passing any value for
 `opt-absolute-size` will result in an `eval_error`.
 
-You can optionally pass the symbol `'copy` to `opt-copy-symbol` to specify that
-`arr` should be left unchanged and that a copy should instead be made. Don't
-worry about the exact position of the argument, the only important part is that
-`opt-copy-symbol` is last. So you can give a value for `opt-copy-symbol` even
-when `opt-absolute-size` isn't passed. You can also for completeness pass the
-symbol `'mut` to specify that the standard behaviour of modifying `arr` in place
-should remain in effect.
-
 When growing the length of the array a new range will be allocated and the old
 data copied over. The new bytes will be initialised to zero. If the new length
 of the array is smaller than the previous the allocated range will simply be
@@ -4614,7 +4496,7 @@ It is possible to shrink an array to a length of zero.
 
 **Note**  
 The array will be resized in place. The returned reference to `arr` is just for
-convenience. (Unless `opt-copy-symbol` is `'copy` of course.)
+convenience.
 
 Example where we remove the terminating null byte from a string buffer:
 ```clj
@@ -4629,18 +4511,6 @@ Example where we increase the length of `buf` to 5:
 (bufset-u8 buf 4 5) ; we set it to avoid LBM printing the array as a string
 (print buf)
 > [1 2 3 4 5]
-```
-
-Example where we create a copy of `name` with the terminating null byte
-removed.
-```clj
-(def name "name")
-(def name-array (buf-resize name -1 'copy))
-
-(print name)
-> "name"
-(print name-array)
-> [110 97 109 101]
 ```
 
 ---
@@ -5283,22 +5153,6 @@ Returns date and time of the last position sample as a list with the format (yea
 ```
 
 Returns the age of the last gnss-sample in seconds.
-
----
-
-#### ublox-init
-
-| Platforms | Firmware |
-|---|---|
-| Express | 6.05+ |
-
-```clj
-(ublox-init optRateMs)
-```
-
-Re-initializes the ublox gnss-module. Returns true on success and nil on failure. Nil most likely means that something is wrong with the connection.
-
-The optional argument optRateMs can be used to set the navigation rate in milliseconds. By default 500 ms us used. Not any navigation rate is possible, it depends on the ublox module in use. Common rates that can work are 100, 200, 500, 1000 and 2000 ms.
 
 ---
 

@@ -148,7 +148,7 @@ static THD_FUNCTION(led_thread, arg) {
 	}
 }
 
-static THD_FUNCTION(periodic_thread, arg) {
+static THD_FUNCTION(periodic_thread, arg) {   //周期更新数据，各种数据（包含编码器）
 	(void)arg;
 
 	chRegSetThreadName("Main periodic");
@@ -162,7 +162,7 @@ static THD_FUNCTION(periodic_thread, arg) {
 
 		switch (display_mode) {
 		case DISP_POS_MODE_ENCODER:
-			commands_send_rotor_pos(encoder_read_deg());
+			commands_send_rotor_pos(encoder_read_deg());    //更新编码器
 			break;
 
 		case DISP_POS_MODE_PID_POS:

@@ -81,7 +81,7 @@ void app_adc_configure(adc_config *conf) {
 	ms_without_power = 0.0;
 }
 
-void app_adc_start(bool use_rx_tx) {
+void app_adc_start(bool use_rx_tx) {   //这应该是外部ADC的开启函数
 #ifdef HW_ADC_EXT_GPIO
 	palSetPadMode(HW_ADC_EXT_GPIO, HW_ADC_EXT_PIN, PAL_MODE_INPUT_ANALOG);
 #endif
@@ -160,7 +160,7 @@ bool app_adc_range_ok(void) {
 	return range_ok;
 }
 
-static THD_FUNCTION(adc_thread, arg) {
+static THD_FUNCTION(adc_thread, arg) {   //都是对外部ADC采样
 	(void)arg;
 
 	chRegSetThreadName("APP_ADC");
@@ -170,7 +170,7 @@ static THD_FUNCTION(adc_thread, arg) {
 		// Sleep for a time according to the specified rate
 		systime_t sleep_time = CH_CFG_ST_FREQUENCY / config.update_rate_hz;
 
-		// At least one tick should be slept to not block the other threads
+		// At least one tick should be slept to not block the other threads   //有点像osdelay(1)
 		if (sleep_time == 0) {
 			sleep_time = 1;
 		}

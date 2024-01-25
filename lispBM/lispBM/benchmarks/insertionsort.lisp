@@ -7,10 +7,10 @@
                               (cons l (cons a xs))
                               (cons a (insert l xs)))))))
 
-(define isort (lambda (ls)
+(define sort (lambda (ls)
                (match ls
                       (nil nil)
                       ( ((? a) . (? xs))
-                        (insert a (isort xs))))))
+                        (insert a (sort xs))))))
 
-(isort '(4 2 0 9 1 56 2 4 7))
+(sort '(4 2 0 9 1 56 2 4 7))

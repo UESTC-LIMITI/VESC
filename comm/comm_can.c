@@ -45,6 +45,36 @@
 #include "lispif.h"
 #endif
 
+#if defined(SHOOT_TEST)  //SHOOT_TEST相关变量
+float accel_current = 60.0f;
+float limit_speed = 20000.0f;
+float target_speed = 20000.0f;
+float limit_pos = 1500.0f;
+int sample_points = 1;
+float brake_current = 60.0f;
+CUSTOM_MODE custom_mode = CUSTOM_MODE_NONE;
+int reset_pos_sample_points = 10000;
+float reset_speed = 1000;
+int send_counter_speed = 0;
+int send_counter_pos = 0;
+float target_duty = 0.3f;
+
+extern float mul_pos;
+extern float brake_pos;
+extern float brake_speed;
+extern uint8_t finish_flag;
+extern uint8_t state_now;
+extern float max_speed_record;
+extern float max_speed_pos_record;
+
+extern int16_t speed_record[SEND_NUM];
+extern int16_t pos_record[SEND_NUM];
+extern uint16_t record_counter;
+
+extern float dI;
+#endif
+
+
 // Settings
 #define RX_FRAMES_SIZE	50
 #define RX_BUFFER_NUM	3
@@ -1184,10 +1214,22 @@ void comm_can_send_status3(uint8_t id, bool replace) {
 void comm_can_send_status4(uint8_t id, bool replace) {
 	int32_t send_index = 0;
 	uint8_t buffer[8];
+#if defined(SHOOT_TEST)
+	if (send_counter_speed <= record_counter && send_counter_speed < SEND_NUM && finish_flag == 1) {
+		for (int i = 0; i < 4; i++) {
+			if(send_counter_speed < record_counter) {
+				buffer_append_int16(buffer, (int16_t)(speed_record[send_counter_speed++]), &send_index);
+				speed_record[send_counter_speed - 1] = 0;
+			} else {
+				buffer_append_int16(buffer, (int16_t)(0), &send_index);
+			}
+		}
+#else
 	buffer_append_int16(buffer, (int16_t)(mc_interface_temp_fet_filtered() * 1e1), &send_index);
 	buffer_append_int16(buffer, (int16_t)(mc_interface_temp_motor_filtered() * 1e1), &send_index);
 	buffer_append_int16(buffer, (int16_t)(mc_interface_get_tot_current_in_filtered() * 1e1), &send_index);
 	buffer_append_int16(buffer, (int16_t)(mc_interface_get_pid_pos_now() * 50.0), &send_index);
+#endif
 	comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_STATUS_4 << 8),
 			buffer, send_index, replace, 0);
 }
@@ -1558,6 +1600,115 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 			mc_interface_set_pid_pos(buffer_get_float32(data8, 1e6, &ind));
 			timeout_reset();
 			break;
+
+#if defined(SHOOT_TEST)  //CAN消息解码
+		case CAN_PACKET_SET_ACCEL_CURRENT:
+			ind = 0;
+			accel_current =(buffer_get_float32(data8, 1e3, &ind));
+			dI = accel_current / 600.0;
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_SET_LIMIT_SPEED:
+			ind = 0;
+			limit_speed = (buffer_get_float32(data8, 1e0, &ind));
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_SET_TARGET_SPEED:
+			ind = 0;
+			target_speed = (buffer_get_float32(data8, 1e0, &ind));
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_SET_LIMIT_POS:
+			ind = 0;
+			limit_pos = (buffer_get_float32(data8, 50, &ind));
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_SET_SAMPLE_POINTS:
+			ind = 0;
+			sample_points = (buffer_get_int32(data8, &ind));
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_SET_BRAKE_CURRENT:
+			ind = 0;
+			brake_current = (buffer_get_float32(data8, 1e3, &ind));
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_SET_CUSTOM_MODE:
+			ind = 0;
+			int temp = (buffer_get_int32(data8, &ind));
+			if (custom_mode == CUSTOM_MODE_NONE && state_now == 0)
+			{
+				// memset(speed_record, 0, sizeof(speed_record));
+				record_counter = 0;
+				switch (temp) {
+				case 1:
+				case 2:
+					state_now++;
+					mc_interface_set_current(accel_current);
+					break;
+				case 3:
+					state_now++;
+					mc_interface_set_pid_speed(-reset_speed);
+					break;
+				case 4:
+					state_now++;
+					mc_interface_set_current(accel_current);
+					break;
+				case 5:
+					state_now++;
+					mc_interface_set_pid_speed(1000);
+					break;
+				case 6:
+					state_now++;
+					mc_interface_set_pid_speed(1000);
+					break;
+				case 7:
+					state_now++;
+					mc_interface_set_pid_speed(1000);
+					break;
+				default:
+					break;
+				}
+			}
+			custom_mode = ((CUSTOM_MODE)temp);
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_ALIVE:
+			ind = 0;
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_SET_RESET_SPEED:
+			ind = 0;
+			reset_speed = (buffer_get_float32(data8, 1e0, &ind));
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_SET_RESET_POS_SAMPLE_POINTS:
+			ind = 0;
+			reset_pos_sample_points = (buffer_get_int32(data8, &ind));
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_SET_TARGET_DUTY:
+			ind = 0;
+			target_duty = (buffer_get_float32(data8, 1e5, &ind));
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_FILL_RX_BUFFER: {
+			int buf_ind = 0;
+			int offset = data8[0];
+			data8++;
+			len--;
+#endif
 
 		case CAN_PACKET_FILL_RX_BUFFER: {
 			int buf_ind = 0;

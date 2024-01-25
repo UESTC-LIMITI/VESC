@@ -740,7 +740,7 @@ bool conf_general_detect_motor_param(float current, float min_rpm, float low_dut
  * @return
  * True for success, false otherwise.
  */
-bool conf_general_measure_flux_linkage(float current, float duty,
+bool conf_general_measure_flux_linkage(float current, float duty,   //测磁通
 		float min_erpm, float res, float *linkage) {
 
 	mc_configuration *mcconf = mempools_alloc_mcconf();

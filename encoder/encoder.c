@@ -43,10 +43,11 @@ typedef enum {
 
 volatile routine_rate_t m_routine_rate = routine_rate_1k;
 static encoder_type_t m_encoder_type_now = ENCODER_TYPE_NONE;
-static float m_enc_custom_pos = 0.0;
+static float m_enc_custom_pos = 0.0;   //客制化编码器的角度储存在这里
+ 
 
-static THD_WORKING_AREA(routine_thread_wa, 256);
-static THD_FUNCTION(routine_thread, arg);
+static THD_WORKING_AREA(routine_thread_wa, 256);  
+static THD_FUNCTION(routine_thread, arg);  //编码器专用线程和working area？
 
 // Private functions
 static void terminal_encoder(int argc, const char **argv);
@@ -55,11 +56,11 @@ static void terminal_encoder_clear_multiturn(int argc, const char **argv);
 static void timer_start(routine_rate_t rate);
 
 // Function pointers
-static float (*m_enc_custom_read_deg)(void) = NULL;
+static float (*m_enc_custom_read_deg)(void) = NULL;  //读客制化编码器的函数指针，要改
 static bool (*m_enc_custom_fault)(void) = NULL;
 static char* (*m_enc_custom_print_info)(void) = NULL;
 
-bool encoder_init(volatile mc_configuration *conf) {
+bool encoder_init(volatile mc_configuration *conf) {  //编码器初始化函数
 	bool res = false;
 
 	if (m_encoder_type_now != ENCODER_TYPE_NONE) {
@@ -71,7 +72,7 @@ bool encoder_init(volatile mc_configuration *conf) {
 	TIM_DeInit(HW_ENC_TIM);
 
 	switch (conf->m_sensor_port_mode) {
-	case SENSOR_PORT_MODE_ABI: {
+	case SENSOR_PORT_MODE_ABI: {                        //使用ABI编码器
 		SENSOR_PORT_5V();
 
 		encoder_cfg_ABI.counts = conf->m_encoder_counts;
@@ -93,7 +94,7 @@ bool encoder_init(volatile mc_configuration *conf) {
 		}
 
 		m_encoder_type_now = ENCODER_TYPE_AS504x;
-		timer_start(routine_rate_10k);
+		timer_start(routine_rate_10k);  //5047好像是占用一个线程的？
 
 		res = true;
 	} break;
@@ -253,9 +254,48 @@ bool encoder_init(volatile mc_configuration *conf) {
 		res = true;
 	} break;
 
-	case SENSOR_PORT_MODE_CUSTOM_ENCODER:
+/**
+ * 客制化编码器 #1
+ * 使用AS5047的 ABI 返回和SPI返回融合
+ * 实现低延迟绝对值编码器
+ * 1.24.2024 先试试使用自带的ABI编码器读取，不自己写
+ * TODO:定时器分配问题，定时器中断回调问题
+ * 1. ABI初始化用到ChibiOS的encoder库，好像读角度要用定时器中断；AS5047似乎只是单纯的SPI通信，没有用到定时器中断 done
+ * 2. ABI外部中断引脚需要去hw里面改，配置也要改 done
+ * 3. 检查定时器中断里有没有写什么会产生冲突的地方，或是任何采集数据过程 done as5047的SPI和ABI可以和其它接口同时使用
+ * 4. 数据融合 done 
+ */
+/**************************************************************************************************/
+
+	case SENSOR_PORT_MODE_CUSTOM_ENCODER:        //客制化编码器
+#if defined (USE_CUSTOM_ENCODER1)
+#if defined (HW_IS_LIMITI_MK1) 
 		m_encoder_type_now = ENCODER_TYPE_CUSTOM;
+		SENSOR_PORT_3V3();
+		
+		encoder_cfg_ABI.counts = conf->m_encoder_counts;
+
+		if (!enc_abi_init(&encoder_cfg_ABI)) {   //先尝试使用内置库  
+			m_encoder_type_now = ENCODER_TYPE_NONE;
+			return false;
+		}
+
+
+		if (!enc_as504x_init(&encoder_cfg_as504x)) {
+			m_encoder_type_now = ENCODER_TYPE_NONE;
+			return false;
+		}
+
+		timer_start(routine_rate_10k);  //5047好像是占用一个线程的？
+		encoder_set_custom_callbacks(custom_as5047_read_deg, 
+									 custom_as5047_fault_check, 
+									 custom_as5047_print_info);  //设置回调函数
+
+		res = true;
+#endif
+#endif
 		break;
+/**************************************************************************************************/
 
 	default:
 		SENSOR_PORT_5V();
@@ -295,7 +335,7 @@ void encoder_update_config(volatile mc_configuration *conf) {
 		sincosf(DEG2RAD_f(conf->m_encoder_sincos_phase_correction), &encoder_cfg_sincos.sph, &encoder_cfg_sincos.cph);
 	} break;
 
-	case SENSOR_PORT_MODE_ABI: {
+	case SENSOR_PORT_MODE_ABI: {                  //ABI编码器更新配置
 		encoder_cfg_ABI.counts = conf->m_encoder_counts;
 	} break;
 
@@ -332,7 +372,7 @@ void encoder_deinit(void) {
 	m_encoder_type_now = ENCODER_TYPE_NONE;
 }
 
-void encoder_set_custom_callbacks (
+void encoder_set_custom_callbacks (   //可以自己写自己的编码器
 		float (*read_deg)(void),
 		bool (*has_fault)(void),
 		char* (*print_info)(void)) {
@@ -356,7 +396,77 @@ void encoder_set_custom_callbacks (
 	}
 }
 
-float encoder_read_deg(void) {
+#if defined (USE_CUSTOM_ENCODER1)
+#if defined (HW_IS_LIMITI_MK1) 
+/**
+ * as5047读角度，SPI绝对值和ABI融合返回位置
+ * 
+ */
+/**************************************************************************************************/
+bool find_index = false;
+bool motor_stop = true;
+bool custom_encoder_fault = false;
+uint8_t custom_encoder_fault_count = 0;
+uint8_t stop_count = 0;
+uint8_t diff_fault_count = 0;
+float last_ABS_ang = 0;
+float last_ABI_ang = 0;
+//bool get_diff = false;
+float ABS_ABI_diff = 0;
+float ABS_ABI_diff_last = 0;
+
+#define multiturn_convert(x) x = x > 180 ? (360 - x) : x
+
+float custom_as5047_read_deg (void) {
+	float ABS_ang = AS504x_LAST_ANGLE(&encoder_cfg_as504x);
+	float ABI_ang = enc_abi_read_deg(&encoder_cfg_ABI);
+	float dtheta = ABI_ang - last_ABI_ang;  
+	float res = 0;
+
+	ABS_ABI_diff = fabs(ABS_ang - ABI_ang);
+	multiturn_convert(ABS_ABI_diff);
+	//get_diff = true;
+
+	if (find_index == true) {
+		res = last_ABS_ang + dtheta;  //当前低延迟角度 = 上次绝对值 + 上次与这次相对值角度误差
+	}
+	else {
+		res = ABS_ang;
+	}
+	if (dtheta < 0.01f) {   //检测电机停止
+		stop_count++;
+		if (stop_count > 10) {
+			find_index = false;  //试行，再启动需要重新依据绝对位置寻找Index
+			stop_count = 0;
+			motor_stop = true;
+		}
+	}
+
+	last_ABS_ang = ABS_ang;
+	last_ABI_ang = ABI_ang;  //更新位置
+	return res;
+}
+
+bool custom_as5047_fault_check(void) {
+	if (fabsf(diff_fault_count - ABS_ABI_diff_last) > 1.0f) {  //相对值绝对值误差变化大于1°，连续5次就报错
+		custom_encoder_fault_count++;
+		if (custom_encoder_fault_count > 5) {
+			return true;
+			custom_encoder_fault_count = 0;
+		}
+	}
+	return false;
+}
+
+char* custom_as5047_print_info(void) {
+	//可能以后加一些
+	return NULL;
+}
+/**************************************************************************************************/
+#endif
+#endif
+
+float encoder_read_deg(void) {  //编码器读角度函数
 	if (m_encoder_type_now == ENCODER_TYPE_AS504x) {
 		return AS504x_LAST_ANGLE(&encoder_cfg_as504x);
 	} else if (m_encoder_type_now == ENCODER_TYPE_MT6816) {
@@ -401,7 +511,7 @@ float encoder_read_deg_multiturn(void) {
 	}
 }
 
-void encoder_set_deg(float deg) {
+void encoder_set_deg(float deg) {  //给ABI编码器设置角度？？
 	utils_norm_angle(&deg);
 
 	if (m_encoder_type_now == ENCODER_TYPE_ABI) {
@@ -484,7 +594,7 @@ float encoder_get_error_rate(void) {
 }
 
 // Check for encoder faults that should stop the motor with a fault code.
-void encoder_check_faults(volatile mc_configuration *m_conf, bool is_second_motor) {
+void encoder_check_faults(volatile mc_configuration *m_conf, bool is_second_motor) {  //编码器错误
 
 	// Only generate fault code when the encoder is being used. Note that encoder faults
 	// that occur above the sensorless ERPM won't stop the motor.
@@ -499,7 +609,7 @@ void encoder_check_faults(volatile mc_configuration *m_conf, bool is_second_moto
 				mc_interface_fault_stop(FAULT_CODE_ENCODER_SPI, is_second_motor, false);
 			}
 
-			if (encoder_cfg_as504x.sw_spi.mosi_gpio != NULL) {
+			if (encoder_cfg_as504x.sw_spi.mosi_gpio != NULL) {   //由于磁性和连接导致的错误
 				AS504x_diag diag = encoder_cfg_as504x.state.sensor_diag;
 				if (!diag.is_connected) {
 					mc_interface_fault_stop(FAULT_CODE_ENCODER_SPI, is_second_motor, false);
@@ -791,7 +901,7 @@ static void terminal_encoder_clear_multiturn(int argc, const char **argv) {
 	commands_printf("Done!\n");
 }
 
-static THD_FUNCTION(routine_thread, arg) {
+static THD_FUNCTION(routine_thread, arg) {    //开了一个线程，自动执行编码器读数据
 	(void)arg;
 	chRegSetThreadName("Enc Routine");
 

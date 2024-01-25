@@ -100,34 +100,7 @@ typedef struct {
 	float i_beta_last;
 } observer_state;
 
-#define MC_AUDIO_CHANNELS	4
-
-typedef enum {
-	MC_AUDIO_OFF = 0,
-	MC_AUDIO_TABLE,
-	MC_AUDIO_SAMPLED,
-} mc_audio_mode;
-
-typedef struct {
-	mc_audio_mode mode;
-
-	const float *table[MC_AUDIO_CHANNELS];
-	int table_len[MC_AUDIO_CHANNELS];
-	float table_voltage[MC_AUDIO_CHANNELS];
-	float table_freq[MC_AUDIO_CHANNELS];
-	float table_pos[MC_AUDIO_CHANNELS];
-
-	// Double-buffered sampled audio
-	const int8_t *sample_table[2];
-	int sample_table_len[2];
-	bool sample_table_filled[2];
-	int sample_table_now;
-	float sample_freq;
-	float sample_pos;
-	float sample_voltage;
-} mc_audio_state;
-
-typedef struct {
+typedef struct {             //电机的所有参数
 	mc_configuration *m_conf;
 	mc_state m_state;
 	mc_control_mode m_control_mode;
@@ -165,6 +138,7 @@ typedef struct {
 	int m_tachometer_abs;
 	float m_pos_pid_now;
 	float m_gamma_now;
+	//使用编码器
 	bool m_using_encoder;
 	int m_duty1_next, m_duty2_next, m_duty3_next;
 	bool m_duty_next_set;
@@ -177,9 +151,6 @@ typedef struct {
 	int m_hfi_plot_en;
 	float m_hfi_plot_sample;
 
-	// Audio Modulation
-	mc_audio_state m_audio;
-
 	// For braking
 	float m_br_speed_before;
 	float m_br_vq_before;
@@ -188,6 +159,7 @@ typedef struct {
 	float m_duty_abs_filtered;
 	float m_duty_filtered;
 	bool m_was_control_duty;
+	//PI控制的占空比
 	float m_duty_i_term;
 	bool duty_was_pi;
 	float duty_pi_duty_last;
@@ -201,6 +173,7 @@ typedef struct {
 	float m_pid_div_angle_accumulator;
 	float m_min_rpm_hyst_timer;
 	float m_min_rpm_timer;
+	//HFI参数
 	bool m_cc_was_hfi;
 	float m_pos_i_term;
 	float m_pos_prev_error;
@@ -213,6 +186,7 @@ typedef struct {
 	float m_speed_prev_error;
 	float m_speed_d_filter;
 	int m_ang_hall_int_prev;
+	//HALL 参数
 	bool m_using_hall;
 	float m_ang_hall;
 	float m_ang_hall_rate_limited;

@@ -217,7 +217,7 @@
 // Input voltage
 #define GET_INPUT_VOLTAGE()		((V_REG / 4095.0) * (float)ADC_Value[ADC_IND_VIN_SENS] * ((VIN_R1 + VIN_R2) / VIN_R2))
 
-// NTC Termistors
+// NTC Termistors  //热敏电阻的采样
 #define NTC_RES(adc_val)		((4095.0 * 10000.0) / adc_val - 10000.0)
 #define NTC_TEMP(adc_ind)		(1.0 / ((logf(NTC_RES(ADC_Value[adc_ind]) / 10000.0) / 3380.0) + (1.0 / 298.15)) - 273.15)
 
@@ -225,7 +225,7 @@
 #define NTC_TEMP_MOTOR(beta)	(1.0 / ((logf(NTC_RES_MOTOR(ADC_Value[ADC_IND_TEMP_MOTOR]) / 10000.0) / beta) + (1.0 / 298.15)) - 273.15)
 
 // Voltage on ADC channel
-#define ADC_VOLTS(ch)			((float)ADC_Value[ch] / 4096.0 * V_REG)
+#define ADC_VOLTS(ch)			((float)ADC_Value[ch] / 4096.0 * V_REG)  //获取ADC_VOLTS，这个ADC_Value似乎一直在获取最新的ADC采样值
 
 // Double samples in beginning and end for positive current measurement.
 // Useful when the shunt sense traces have noise that causes offset.
@@ -245,7 +245,7 @@
 #define HW_ADC_EXT2_GPIO		GPIOA
 #define HW_ADC_EXT2_PIN			6
 
-// UART Peripheral
+// UART Peripheral    //UART端口配置
 #define HW_UART_DEV				SD3
 #define HW_UART_GPIO_AF			GPIO_AF_USART3
 #define HW_UART_TX_PORT			GPIOB
@@ -338,7 +338,7 @@
 #define HW_SPI_PIN_MISO			6
 #endif
 
-// SPI for DRV8301
+// SPI for DRV8301  //DRV8301的SPI，之后可以改成DRV8320
 #if !defined(HW60_IS_MK3) && !defined(HW60_IS_MK4) && !defined(HW60_IS_MK5) && !defined(HW60_IS_MK6)
 #define DRV8301_MOSI_GPIO		GPIOC
 #define DRV8301_MOSI_PIN		12
@@ -359,7 +359,7 @@
 #define DRV8301_CS_PIN			9
 #endif
 
-// MPU9250
+// MPU9250  //惯导模块端口定义，用不到
 #if !defined(HW60_IS_MK4) && !defined(HW60_IS_MK5) && !defined(HW60_IS_MK6)
 #define MPU9X50_SDA_GPIO		GPIOB
 #define MPU9X50_SDA_PIN			2
@@ -394,29 +394,29 @@
 #define NRF5x_SWCLK_PIN			4
 #endif
 
-// Measurement macros
+// Measurement macros    //三个采样ADC的定义，直接测电压而不是上面可选的测电流的ADC
 #define ADC_V_L1				ADC_Value[ADC_IND_SENS1]
 #define ADC_V_L2				ADC_Value[ADC_IND_SENS2]
 #define ADC_V_L3				ADC_Value[ADC_IND_SENS3]
-#define ADC_V_ZERO				(ADC_Value[ADC_IND_VIN_SENS] / 2)
+#define ADC_V_ZERO				(ADC_Value[ADC_IND_VIN_SENS] / 2)  //zero ADC有什么用呢？
 
 // Macros
-#define READ_HALL1()			palReadPad(HW_HALL_ENC_GPIO1, HW_HALL_ENC_PIN1)
+#define READ_HALL1()			palReadPad(HW_HALL_ENC_GPIO1, HW_HALL_ENC_PIN1) //直接用宏定义读HALL的值吗
 #define READ_HALL2()			palReadPad(HW_HALL_ENC_GPIO2, HW_HALL_ENC_PIN2)
 #define READ_HALL3()			palReadPad(HW_HALL_ENC_GPIO3, HW_HALL_ENC_PIN3)
 
 // Default setting overrides
 #ifndef MCCONF_DEFAULT_MOTOR_TYPE
-#define MCCONF_DEFAULT_MOTOR_TYPE		MOTOR_TYPE_FOC
+#define MCCONF_DEFAULT_MOTOR_TYPE		MOTOR_TYPE_FOC  //默认控电机模式就是FOC
 #endif
 #ifndef MCCONF_FOC_F_ZV
 #define MCCONF_FOC_F_ZV					30000.0
 #endif
 #ifndef MCCONF_L_MAX_ABS_CURRENT
-#define MCCONF_L_MAX_ABS_CURRENT		150.0	// The maximum absolute current above which a fault is generated
+#define MCCONF_L_MAX_ABS_CURRENT		150.0	// The maximum absolute current above which a fault is generated  //nolimits版本固件应该没有这个限制
 #endif
 #ifndef MCCONF_FOC_SAMPLE_V0_V7
-#define MCCONF_FOC_SAMPLE_V0_V7			false	// Run control loop in both v0 and v7 (requires phase shunts)
+#define MCCONF_FOC_SAMPLE_V0_V7			false	// Run control loop in both v0 and v7 (requires phase shunts)   //phase shunts 到底是什么？我们能不能搞一个？
 #endif
 
 // Setting limits
@@ -432,11 +432,11 @@
 #define HW_LIM_CURRENT_IN		-120.0, 120.0
 #define HW_LIM_CURRENT_ABS		0.0, 160.0
 #endif
-#define HW_LIM_VIN				6.0, 57.0
+#define HW_LIM_VIN				6.0, 57.0         //最大支持57V电压 （DRV8301：流汗
 #define HW_LIM_ERPM				-200e3, 200e3
 #define HW_LIM_DUTY_MIN			0.0, 0.1
-#define HW_LIM_DUTY_MAX			0.0, 0.99
-#define HW_LIM_TEMP_FET			-40.0, 110.0
+#define HW_LIM_DUTY_MAX			0.0, 0.99     //占空比限制在 0.1 ~ 0.99 不在范围内都没法转？
+#define HW_LIM_TEMP_FET			-40.0, 110.0  //mos温控，林哥版本上有没有呢？
 
 // Functions
 #if defined(HW60_IS_MK3) || defined(HW60_IS_MK4) || defined(HW60_IS_MK5) || defined(HW60_IS_MK6)

@@ -1,4 +1,14 @@
 /*
+ * @Author: xiayuan 1137542776@qq.com
+ * @Date: 2023-12-19 08:52:42
+ * @LastEditors: xiayuan 1137542776@qq.com
+ * @LastEditTime: 2024-01-25 00:06:32
+ * @FilePath: \VESC_Origin\irq_handlers.c
+ * @Description: 
+ * 
+ * Copyright (c) 2024 by UESTC_LIMITI, All Rights Reserved. 
+ */
+/*
 	Copyright 2016 Benjamin Vedder	benjamin@vedder.se
 
 	This file is part of the VESC firmware.
@@ -26,14 +36,14 @@
 #include "hw.h"
 #include "encoder/encoder.h"
 
-CH_IRQ_HANDLER(ADC1_2_3_IRQHandler) {
+CH_IRQ_HANDLER(ADC1_2_3_IRQHandler) {    //ADC专用IRQ
 	CH_IRQ_PROLOGUE();
 	ADC_ClearITPendingBit(ADC1, ADC_IT_JEOC);
 	mc_interface_adc_inj_int_handler();
 	CH_IRQ_EPILOGUE();
 }
 
-CH_IRQ_HANDLER(HW_ENC_EXTI_ISR_VEC) {
+CH_IRQ_HANDLER(HW_ENC_EXTI_ISR_VEC) {   //定时器外部中断专用IRQ
 	if (EXTI_GetITStatus(HW_ENC_EXTI_LINE) != RESET) {
 		encoder_pin_isr();
 
@@ -44,14 +54,14 @@ CH_IRQ_HANDLER(HW_ENC_EXTI_ISR_VEC) {
 
 CH_IRQ_HANDLER(HW_ENC_TIM_ISR_VEC) {
 	if (TIM_GetITStatus(HW_ENC_TIM, TIM_IT_Update) != RESET) {
-		encoder_tim_isr();
+		encoder_tim_isr();   //定时器专用IRQ
 
 		// Clear the IT pending bit
 		TIM_ClearITPendingBit(HW_ENC_TIM, TIM_IT_Update);
 	}
 }
 
-CH_IRQ_HANDLER(TIM2_IRQHandler) {
+CH_IRQ_HANDLER(TIM2_IRQHandler) {  //mcpwm专用定时器IRQ
 	if (TIM_GetITStatus(TIM2, TIM_IT_CC2) != RESET) {
 		mcpwm_foc_tim_sample_int_handler();
 
