@@ -22,6 +22,7 @@
 
 #include "encoder_datatype.h"
 
+
 // Global encoder configurations
 extern ABI_config_t encoder_cfg_ABI;
 extern AD2S1205_config_t encoder_cfg_ad2s1205;

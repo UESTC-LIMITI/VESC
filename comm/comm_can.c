@@ -1224,6 +1224,7 @@ void comm_can_send_status4(uint8_t id, bool replace) {
 				buffer_append_int16(buffer, (int16_t)(0), &send_index);
 			}
 		}
+	}
 #else
 	buffer_append_int16(buffer, (int16_t)(mc_interface_temp_fet_filtered() * 1e1), &send_index);
 	buffer_append_int16(buffer, (int16_t)(mc_interface_temp_motor_filtered() * 1e1), &send_index);
@@ -1232,6 +1233,7 @@ void comm_can_send_status4(uint8_t id, bool replace) {
 #endif
 	comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_STATUS_4 << 8),
 			buffer, send_index, replace, 0);
+	
 }
 
 void comm_can_send_status5(uint8_t id, bool replace) {
@@ -1703,11 +1705,6 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 			timeout_reset();
 			break;
 
-		case CAN_PACKET_FILL_RX_BUFFER: {
-			int buf_ind = 0;
-			int offset = data8[0];
-			data8++;
-			len--;
 #endif
 
 		case CAN_PACKET_FILL_RX_BUFFER: {

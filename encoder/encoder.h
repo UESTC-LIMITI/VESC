@@ -35,6 +35,8 @@
 #include "enc_tle5012.h"
 #include "enc_ts5700n8501.h"
 
+
+
 #if defined (USE_CUSTOM_ENCODER1)
 #if defined (HW_IS_LIMITI_MK1) 
 extern bool find_index;

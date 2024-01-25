@@ -26,8 +26,8 @@
 #include "mc_interface.h"
 
 //一些硬件的使用
-#if !defined(HW_IS_LIMITI_MK1) 
-//#include "drv8301.h"
+#if defined(HW_HAS_DRV8301) 
+#include "drv8301.h"
 #endif
 
 // Variables

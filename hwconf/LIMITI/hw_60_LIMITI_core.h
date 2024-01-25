@@ -39,9 +39,6 @@
 #define HW_HAS_PERMANENT_NRF
 #endif
 
-//功能可选项
-#define SHOOT_TEST
-#define USE_CUSTOM_ENCODER1
 
 // Macros
 #ifdef HW60_VEDDER_FIRST_PCB

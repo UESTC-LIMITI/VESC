@@ -24,6 +24,8 @@
 #include <stdbool.h>
 #include "ch.h"
 
+
+
 #if defined(SHOOT_TEST) //SHOOT_TEST的CUSTOM_MODE定义
 #define SEND_NUM 3000
 typedef enum {
