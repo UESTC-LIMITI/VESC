@@ -273,6 +273,7 @@ bool encoder_init(volatile mc_configuration *conf) {  //编码器初始化函数
 		m_encoder_type_now = ENCODER_TYPE_CUSTOM;
 		SENSOR_PORT_3V3();
 		
+		conf->m_encoder_counts = 4000;
 		encoder_cfg_ABI.counts = conf->m_encoder_counts;
 
 		if (!enc_abi_init(&encoder_cfg_ABI)) {   //先尝试使用内置库  
