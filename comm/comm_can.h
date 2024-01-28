@@ -95,4 +95,13 @@ void comm_can_send_status4(uint8_t id, bool replace);
 void comm_can_send_status5(uint8_t id, bool replace);
 void comm_can_send_status6(uint8_t id, bool replace);
 
+/**
+ * 在comm_can里自定义的函数
+ */
+
+//#define CUSTOM_STATUS  //自定义回传状态
+
+#if defined(CUSTOM_STATUS)
+void custom_append_float(uint8_t* buffer, float value, int32_t* index);
+#endif
 #endif /* COMM_CAN_H_ */

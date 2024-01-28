@@ -45,7 +45,7 @@ typedef enum {
 	CAN_PACKET_STATUS_3						= 15,
 	CAN_PACKET_STATUS_4						= 16,
 	CAN_PACKET_SHUTDOWN						= 31,
-} CAN_PACKET_ID
+} CAN_PACKET_ID;
 
 typedef struct
 {
@@ -64,15 +64,14 @@ typedef enum {
 	Set_id_Wrong,
 }VESC_ErrorCode_t;
 
-motor_info_t motor_info[8] = {0};
 extern motor_info_t motor_info[8];
-
+extern uint8_t VESC_Send_Buffer[4];
 
 /*CAN接收函数,应将其写入回调函数内*/
 float uchar2float(uint8_t* buffer, uint32_t *index);
 
-bool VESC_CAN_decode(uint32_t ExtID, uint8_t *pData, CAN_HandleTypeDef *hcan);
-bool VESC_CAN_SendData(CAN_HandleTypeDef *hcan, uint8_t id);
+bool VESC_CAN_decode(uint32_t ExtID, uint8_t *pData);
+bool VESC_CAN_SendData(CAN_HandleTypeDef *hcan, uint8_t id, uint32_t eid);
 
 bool VESC_SetRPM(float value, uint8_t id, CAN_HandleTypeDef *hcan);
 bool VESC_SetDutyCycle(float value, uint8_t id, CAN_HandleTypeDef *hcan);
@@ -80,6 +79,6 @@ bool VESC_SetCurrent(float value, uint8_t id, CAN_HandleTypeDef *hcan);
 bool VESC_SetCurrentBrake(float value, uint8_t id, CAN_HandleTypeDef *hcan);
 bool VESC_SetPos(float value, uint8_t id, CAN_HandleTypeDef *hcan);
 
-static void VESC_Error_Handler(VESC_ErrorCode_t Code)
+static void VESC_Error_Handler(VESC_ErrorCode_t Code);
 
 #endif

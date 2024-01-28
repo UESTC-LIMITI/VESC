@@ -1188,14 +1188,15 @@ CANRxFrame *comm_can_get_rx_frame(int interface) {
 	return res;
 }
 
-#define CUSTOM_STATUS  //自定义回传状态
 
 #if defined(CUSTOM_STATUS)
 //float* convert_p;
 
-static void custom_append_float(uint8_t buffer, float value, int32_t* index) {
-	memcpy((buffer + index), &value, 4);
-	(*index) += 4;
+void custom_append_float(uint8_t* buffer, float value, int32_t* index) {
+	uint32_t temp = (uint32_t)value;
+	for(int i = 3; i >= 0; i++) {
+		buffer[((*index)++) + i] = (temp >>(3-i)*8) & 0xff;
+	}
 }
 #endif
 

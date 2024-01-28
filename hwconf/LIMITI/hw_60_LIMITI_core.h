@@ -33,7 +33,7 @@
 #define HW_MINOR				1
 
 // HW properties
-#define HW_HAS_DRV8301
+//#define HW_HAS_DRV8301
 #define HW_HAS_3_SHUNTS
 //#define HW_HAS_PHASE_SHUNTS
 #if !defined(HW_IS_LIMITI_MK1)
@@ -51,25 +51,27 @@
 #endif
 #define DCCAL_ON()
 #define DCCAL_OFF()
-//#define IS_DRV_FAULT()			(!palReadPad(GPIOB, 7))
-
+#if defined(HW_HAS_DRV8301)
+#define IS_DRV_FAULT()			(!palReadPad(GPIOB, 7))
+#endif
 
 #define LED_GREEN_ON()			palSetPad(GPIOB, 0)
 #define LED_GREEN_OFF()			palClearPad(GPIOB, 0)
 #define LED_RED_ON()			palSetPad(GPIOB, 1)
 #define LED_RED_OFF()			palClearPad(GPIOB, 1)
 
+#define OBTUSE_ANGLE //钝角板子
+#if !defined(OBTUSE_ANGLE)
 #define CURRENT_FILTER_ON()		palSetPad(GPIOD, 2)
 #define CURRENT_FILTER_OFF()	palClearPad(GPIOD, 2)  //钝角上似乎没有 CURRENT_FILTER
 
-#if defined (HW_IS_LIMITI_MK1)
 #define HW_HAS_PHASE_FILTERS
 #define PHASE_FILTER_GPIO		GPIOC
 #define PHASE_FILTER_PIN		13
 #define PHASE_FILTER_ON()		palSetPad(PHASE_FILTER_GPIO, PHASE_FILTER_PIN)
 #define PHASE_FILTER_OFF()		palClearPad(PHASE_FILTER_GPIO, PHASE_FILTER_PIN) //没有PHASE_FILTER
 #endif
-
+#endif
 
 //#if defined (HW_IS_LIMITI_MK1)   //小改动，尝试注释所有关于shutdown的代码
 // Shutdown pin
@@ -221,7 +223,7 @@
 #define HW_UART_RX_PORT			GPIOB
 #define HW_UART_RX_PIN			11
 
-#if defined (HW_IS_LIMITI_MK1)   //NRF可以挂在UART上？ 另一个UART口
+//#if defined (HW_IS_LIMITI_MK1)   //NRF可以挂在UART上？ 另一个UART口
 // Permanent UART Peripheral (for NRF51)
 #define HW_UART_P_BAUD			115200
 #define HW_UART_P_DEV			SD4
@@ -231,7 +233,7 @@
 #define HW_UART_P_TX_PIN		12 // This is a mistake in the HW. We have to use a hack to use UART5.
 #define HW_UART_P_RX_PORT		GPIOC
 #define HW_UART_P_RX_PIN		11
-#endif
+//#endif
 
 // ICU Peripheral for servo decoding  //舵机的timer？用不到
 #define HW_USE_SERVO_TIM4
@@ -365,6 +367,11 @@
 #define HW_LIM_DUTY_MIN			0.0, 0.1
 #define HW_LIM_DUTY_MAX			0.0, 0.99     //占空比限制在 0.1 ~ 0.99 不在范围内都没法转？
 #define HW_LIM_TEMP_FET			-40.0, 110.0  //mos温控，林哥版本上有没有呢？
+
+#if defined(HW_HAS_DRV8301)
+#ifndef MCCONF_M_DRV8301_OC_ADJ
+#define MCCONF_M_DRV8301_OC_ADJ	19 // DRV8301 over current protection threshold
+#endif
 
 // Functions
 //#if defined (HW_IS_LIMITI_MK1)   //小改动，尝试注释所有关于shutdown的代码

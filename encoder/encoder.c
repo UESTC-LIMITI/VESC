@@ -971,7 +971,7 @@ static void timer_start(routine_rate_t rate) {
  * 编码器多圈计算函数，自己加的
  */
 /**************************************************************************************************/
-static void encoder_multiturn_calc(void) {
+void encoder_multiturn_calc(void) {
 	pos_temp = mc_interface_get_pid_pos_now();
 	if (pos_temp > 270 && pos_temp_pre < 90)
 		mul_pos_base -= 360;
@@ -982,7 +982,7 @@ static void encoder_multiturn_calc(void) {
 }
 
 float encoder_get_multiturn(void) {
-	if (m_encoder_type_now = ENCODER_TYPE_NONE) {
+	if (m_encoder_type_now == ENCODER_TYPE_NONE) {
 		return 0;
 	} else {
 		return mul_pos;

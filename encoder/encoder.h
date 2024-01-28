@@ -72,7 +72,7 @@ void encoder_pin_isr(void);
 void encoder_tim_isr(void);
 
 //自己加的编码器多圈计算，在routine里跑自动计算多圈
-static void encoder_multiturn_calc(void);
+void encoder_multiturn_calc(void);
 float encoder_get_multiturn(void);
 
 #endif /* ENCODER_ENCODER_H_ */
