@@ -33,6 +33,18 @@
 
 #include <math.h>
 
+int mul_pos_base = 0;
+float mul_pos = 0;
+float pos_temp = 0;
+float pos_temp_pre = 0;
+
+extern int mul_pos_base;
+extern float mul_pos;
+extern float pos_temp;
+extern float pos_temp_pre;
+
+
+
 // These rates turn into even multiples of systicks
 typedef enum {
 	routine_rate_1k = 0,
@@ -269,7 +281,6 @@ bool encoder_init(volatile mc_configuration *conf) {  //编码器初始化函数
 
 	case SENSOR_PORT_MODE_CUSTOM_ENCODER:        //客制化编码器
 #if defined (USE_CUSTOM_ENCODER1)
-#if defined (HW_IS_LIMITI_MK1) 
 		m_encoder_type_now = ENCODER_TYPE_CUSTOM;
 		SENSOR_PORT_3V3();
 		
@@ -293,7 +304,6 @@ bool encoder_init(volatile mc_configuration *conf) {  //编码器初始化函数
 									 custom_as5047_print_info);  //设置回调函数
 
 		res = true;
-#endif
 #endif
 		break;
 /**************************************************************************************************/
@@ -398,7 +408,6 @@ void encoder_set_custom_callbacks (   //可以自己写自己的编码器
 }
 
 #if defined (USE_CUSTOM_ENCODER1)
-#if defined (HW_IS_LIMITI_MK1) 
 /**
  * as5047读角度，SPI绝对值和ABI融合返回位置
  * 
@@ -464,7 +473,6 @@ char* custom_as5047_print_info(void) {
 	return NULL;
 }
 /**************************************************************************************************/
-#endif
 #endif
 
 float encoder_read_deg(void) {  //编码器读角度函数
@@ -539,6 +547,7 @@ void encoder_reset_multiturn(void) {
 	if (m_encoder_type_now == ENCODER_TYPE_TS5700N8501) {
 		return enc_ts5700n8501_reset_multiturn(&encoder_cfg_TS5700N8501);
 	}
+	mul_pos_base = 0;  //多圈基数归零
 }
 
 void encoder_reset_errors(void) {
@@ -936,6 +945,8 @@ static THD_FUNCTION(routine_thread, arg) {    //开了一个线程，自动执�
 			break;
 		}
 
+		encoder_multiturn_calc();
+
 		switch (m_routine_rate) {
 		case routine_rate_1k: chThdSleep(CH_CFG_ST_FREQUENCY / 1000); break;
 		case routine_rate_2k: chThdSleep(CH_CFG_ST_FREQUENCY / 2000); break;
@@ -955,3 +966,26 @@ static void timer_start(routine_rate_t rate) {
 		chThdCreateStatic(routine_thread_wa, sizeof(routine_thread_wa), NORMALPRIO + 5, routine_thread, NULL);
 	}
 }
+
+/**
+ * 编码器多圈计算函数，自己加的
+ */
+/**************************************************************************************************/
+static void encoder_multiturn_calc(void) {
+	pos_temp = mc_interface_get_pid_pos_now();
+	if (pos_temp > 270 && pos_temp_pre < 90)
+		mul_pos_base -= 360;
+	else if (pos_temp < 90 && pos_temp_pre > 270)
+		mul_pos_base += 360;
+	pos_temp_pre = pos_temp;
+	mul_pos = mul_pos_base + pos_temp;
+}
+
+float encoder_get_multiturn(void) {
+	if (m_encoder_type_now = ENCODER_TYPE_NONE) {
+		return 0;
+	} else {
+		return mul_pos;
+	}
+}
+/**************************************************************************************************/

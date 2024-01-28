@@ -22,6 +22,8 @@
 #include "ch.h"
 #include "hal.h"
 
+
+
 // Stack area for the running encoder
 static THD_WORKING_AREA(encoder_thread_wa, 256);
 
@@ -107,11 +109,9 @@ TLE5012_config_t encoder_cfg_tle5012 = {
 ABI_config_t encoder_cfg_ABI = {   //对ABI编码器的引脚设置，直接在hw里面改
 		10000, // counts
 #if defined (USE_CUSTOM_ENCODER1)
-#if defined (HW_IS_LIMITI_MK1) 
 		HW_ABI_ENC_GPIO1, HW_ABI_ENC_PIN1,
 		HW_ABI_ENC_GPIO2, HW_ABI_ENC_PIN2,
 		HW_ABI_ENC_GPIO3, HW_ABI_ENC_PIN3,
-#endif
 #else
 		HW_HALL_ENC_GPIO1, HW_HALL_ENC_PIN1,
 		HW_HALL_ENC_GPIO2, HW_HALL_ENC_PIN2,
@@ -120,13 +120,11 @@ ABI_config_t encoder_cfg_ABI = {   //对ABI编码器的引脚设置，直接在h
 		HW_ENC_TIM,
 		HW_ENC_TIM_AF,
 #if defined (USE_CUSTOM_ENCODER1)
-#if defined (HW_IS_LIMITI_MK1) 
 		HW_ABI_EXTI_PORTSRC,
 		HW_ABI_EXTI_PINSRC,
 		HW_ABI_EXTI_LINE,
 		HW_ABI_EXTI_CH,
 
-#endif
 #else
 		HW_ENC_EXTI_PORTSRC,
 		HW_ENC_EXTI_PINSRC,

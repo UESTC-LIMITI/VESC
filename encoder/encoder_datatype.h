@@ -27,6 +27,8 @@
 #include "hal.h"
 #include "spi_bb.h"
 
+
+
 typedef enum {
 	ENCODER_TYPE_NONE = 0,
 	ENCODER_TYPE_AS504x,

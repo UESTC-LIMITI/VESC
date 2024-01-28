@@ -136,7 +136,7 @@ typedef struct {             //电机的所有参数
 	mc_sample_t m_samples;
 	int m_tachometer;
 	int m_tachometer_abs;
-	float m_pos_pid_now;
+	float m_pos_pid_now;  //当前电机单圈位置
 	float m_gamma_now;
 	//使用编码器
 	bool m_using_encoder;

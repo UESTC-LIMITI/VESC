@@ -1481,7 +1481,7 @@ float mc_interface_get_pid_pos_now(void) {
 		break;
 	}
 
-	if (encoder_is_configured()) {
+	if (encoder_is_configured()) {  //这句除了不用编码器，括号内都非0
 		if (conf->foc_encoder_inverted) {
 			ret *= -1.0;
 		}

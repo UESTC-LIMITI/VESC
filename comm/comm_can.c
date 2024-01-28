@@ -53,13 +53,13 @@ float limit_pos = 1500.0f;
 int sample_points = 1;
 float brake_current = 60.0f;
 CUSTOM_MODE custom_mode = CUSTOM_MODE_NONE;
-int reset_pos_sample_points = 10000;
+int reset_pos_sample_points = 5000;
 float reset_speed = 1000;
-int send_counter_speed = 0;
-int send_counter_pos = 0;
+int send_speed_counter = 0;
+int send_pos_counter = 0;
 float target_duty = 0.3f;
+//int test_flag = 0;
 
-extern float mul_pos;
 extern float brake_pos;
 extern float brake_speed;
 extern uint8_t finish_flag;
@@ -72,6 +72,8 @@ extern int16_t pos_record[SEND_NUM];
 extern uint16_t record_counter;
 
 extern float dI;
+//extern int test_flag;
+
 #endif
 
 
@@ -156,7 +158,7 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced);
 static bool(*sid_callback)(uint32_t id, uint8_t *data, uint8_t len) = 0;
 static bool(*eid_callback)(uint32_t id, uint8_t *data, uint8_t len) = 0;
 
-void comm_can_init(void) {
+void comm_can_init(void) {  //初始化
 	for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
 		stat_msgs[i].id = -1;
 		stat_msgs_2[i].id = -1;
@@ -175,14 +177,14 @@ void comm_can_init(void) {
 #if CAN_ENABLE
 	memset(&m_rx_state, 0, sizeof(m_rx_state));
 
-	chMtxObjectInit(&can_mtx);
-	chMtxObjectInit(&can_rx_mtx);
+	chMtxObjectInit(&can_mtx);    //can发送的互斥锁？
+	chMtxObjectInit(&can_rx_mtx); //can接收的互斥锁？
 
 	palSetPadMode(HW_CANRX_PORT, HW_CANRX_PIN,
 			PAL_MODE_ALTERNATE(HW_CAN_GPIO_AF) |
 			PAL_STM32_OTYPE_PUSHPULL |
 			PAL_STM32_OSPEED_MID1);
-	palSetPadMode(HW_CANTX_PORT, HW_CANTX_PIN,
+	palSetPadMode(HW_CANTX_PORT, HW_CANTX_PIN,   //设置CAN端口，这也是可以改的吗？？
 			PAL_MODE_ALTERNATE(HW_CAN_GPIO_AF) |
 			PAL_STM32_OTYPE_PUSHPULL |
 			PAL_STM32_OSPEED_MID1);
@@ -202,7 +204,7 @@ void comm_can_init(void) {
 	canStart(&CAND1, &cancfg);
 	canStart(&CAND2, &cancfg);
 #else
-	// CAND1 must be running for CAND2 to work
+	// CAND1 must be running for CAND2 to work //如果用CAN2，那么CAN1也要被启动
 	CANDriver *cand = &HW_CAN_DEV;
 	if (cand == &CAND2) {
 		canStart(&CAND1, &cancfg);
@@ -211,8 +213,9 @@ void comm_can_init(void) {
 	canStart(&HW_CAN_DEV, &cancfg);
 #endif
 
-	canard_driver_init();
+	canard_driver_init();  //UAVCAN相关
 
+	//4个线程 读取 发送 处理 之类的 读取的优先级比其它高1
 	chThdCreateStatic(cancom_read_thread_wa, sizeof(cancom_read_thread_wa), NORMALPRIO + 1,
 			cancom_read_thread, NULL);
 	chThdCreateStatic(cancom_status_thread_wa, sizeof(cancom_status_thread_wa), NORMALPRIO,
@@ -231,7 +234,7 @@ void comm_can_init(void) {
 #endif
 }
 
-void comm_can_set_baud(CAN_BAUD baud) {
+void comm_can_set_baud(CAN_BAUD baud) {  //波特率
 	switch (baud) {
 	case CAN_BAUD_125K:	set_timing(15, 14, 4); break;
 	case CAN_BAUD_250K:	set_timing(7, 14, 4); break;
@@ -268,6 +271,7 @@ void comm_can_set_baud(CAN_BAUD baud) {
  * 1: CAN1
  * 2: CAN2
  */
+//一般的CAN发送 使用extend id
 void comm_can_transmit_eid_replace(uint32_t id, const uint8_t *data, uint8_t len, bool replace, int interface) {
 	if (len > 8) {
 		len = 8;
@@ -297,7 +301,7 @@ void comm_can_transmit_eid_replace(uint32_t id, const uint8_t *data, uint8_t len
 	txmsg.EID = id;
 	txmsg.RTR = CAN_RTR_DATA;
 	txmsg.DLC = len;
-	memcpy(txmsg.data8, data, len);
+	memcpy(txmsg.data8, data, len);  //CAN帧结构配置
 
 	chMtxLock(&can_mtx);
 #ifdef HW_CAN2_DEV
@@ -317,7 +321,7 @@ void comm_can_transmit_eid_replace(uint32_t id, const uint8_t *data, uint8_t len
 	}
 #else
 	(void)interface;
-	canTransmit(&HW_CAN_DEV, CAN_ANY_MAILBOX, &txmsg, MS2ST(5));
+	canTransmit(&HW_CAN_DEV, CAN_ANY_MAILBOX, &txmsg, MS2ST(5)); //发送咯 直接用ChibiOS的函数（ChibiOS真好用吧）
 #endif
 	chMtxUnlock(&can_mtx);
 #else
@@ -376,7 +380,7 @@ void comm_can_transmit_sid(uint32_t id, const uint8_t *data, uint8_t len) {
 }
 
 /**
- * Set function to be called when standard CAN frames are received.
+ * Set function to be called when standard CAN frames are received.  //设置CAN回调函数 接收标准帧
  *
  * The callback should return true if the frame was used by the application, false otherwise. if
  * the frame was used, no further processing will be done here.
@@ -421,7 +425,8 @@ void comm_can_set_eid_rx_callback(bool (*p_func)(uint32_t id, uint8_t *data, uin
  * 2: Packet goes to commands_process and send function is set to null
  *    so that no reply is sent back.
  */
-void comm_can_send_buffer(uint8_t controller_id, uint8_t *data, unsigned int len, uint8_t send) {
+//传递buffer去发送或者处理函数 很有意思的结点
+void comm_can_send_buffer(uint8_t controller_id, uint8_t *data, unsigned int len, uint8_t send) { 
 	uint8_t send_buffer[8];
 
 	if (len <= 6) {
@@ -1183,12 +1188,28 @@ CANRxFrame *comm_can_get_rx_frame(int interface) {
 	return res;
 }
 
-void comm_can_send_status1(uint8_t id, bool replace) {
+#define CUSTOM_STATUS  //自定义回传状态
+
+#if defined(CUSTOM_STATUS)
+//float* convert_p;
+
+static void custom_append_float(uint8_t buffer, float value, int32_t* index) {
+	memcpy((buffer + index), &value, 4);
+	(*index) += 4;
+}
+#endif
+
+void comm_can_send_status1(uint8_t id, bool replace) {  //can status 状态消息回传
 	int32_t send_index = 0;
 	uint8_t buffer[8];
+#if defined(CUSTOM_STATUS)
+	custom_append_float(buffer, (float)mc_interface_get_rpm(), &send_index);
+	custom_append_float(buffer, (float)mc_interface_get_duty_cycle_now(), &send_index);
+#else
 	buffer_append_int32(buffer, (int32_t)mc_interface_get_rpm(), &send_index);
 	buffer_append_int16(buffer, (int16_t)(mc_interface_get_tot_current_filtered() * 1e1), &send_index);
 	buffer_append_int16(buffer, (int16_t)(mc_interface_get_duty_cycle_now() * 1e3), &send_index);
+#endif
 	comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_STATUS << 8),
 			buffer, send_index, replace, 0);
 }
@@ -1196,8 +1217,13 @@ void comm_can_send_status1(uint8_t id, bool replace) {
 void comm_can_send_status2(uint8_t id, bool replace) {
 	int32_t send_index = 0;
 	uint8_t buffer[8];
+#if defined(CUSTOM_STATUS)
+	custom_append_float(buffer, (float)mc_interface_get_pid_pos_now(), &send_index);
+	custom_append_float(buffer, (float)encoder_get_multiturn(), &send_index);
+#else
 	buffer_append_int32(buffer, (int32_t)(mc_interface_get_amp_hours(false) * 1e4), &send_index);
 	buffer_append_int32(buffer, (int32_t)(mc_interface_get_amp_hours_charged(false) * 1e4), &send_index);
+#endif
 	comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_STATUS_2 << 8),
 			buffer, send_index, replace, 0);
 }
@@ -1205,8 +1231,13 @@ void comm_can_send_status2(uint8_t id, bool replace) {
 void comm_can_send_status3(uint8_t id, bool replace) {
 	int32_t send_index = 0;
 	uint8_t buffer[8];
+#if defined(CUSTOM_STATUS)
+	custom_append_float(buffer, (float)mc_interface_get_tot_current_in_filtered(), &send_index);
+	custom_append_float(buffer, (float)mc_interface_get_input_voltage_filtered(), &send_index);
+#else
 	buffer_append_int32(buffer, (int32_t)(mc_interface_get_watt_hours(false) * 1e4), &send_index);
 	buffer_append_int32(buffer, (int32_t)(mc_interface_get_watt_hours_charged(false) * 1e4), &send_index);
+#endif
 	comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_STATUS_3 << 8),
 			buffer, send_index, replace, 0);
 }
@@ -1215,11 +1246,11 @@ void comm_can_send_status4(uint8_t id, bool replace) {
 	int32_t send_index = 0;
 	uint8_t buffer[8];
 #if defined(SHOOT_TEST)
-	if (send_counter_speed <= record_counter && send_counter_speed < SEND_NUM && finish_flag == 1) {
+	if (send_speed_counter <= record_counter && send_speed_counter < SEND_NUM && finish_flag == 1) {
 		for (int i = 0; i < 4; i++) {
-			if(send_counter_speed < record_counter) {
-				buffer_append_int16(buffer, (int16_t)(speed_record[send_counter_speed++]), &send_index);
-				speed_record[send_counter_speed - 1] = 0;
+			if(send_speed_counter < record_counter) {
+				buffer_append_int16(buffer, (int16_t)(speed_record[send_speed_counter++]), &send_index);
+				speed_record[send_speed_counter - 1] = 0;
 			} else {
 				buffer_append_int16(buffer, (int16_t)(0), &send_index);
 			}
@@ -1239,11 +1270,26 @@ void comm_can_send_status4(uint8_t id, bool replace) {
 void comm_can_send_status5(uint8_t id, bool replace) {
 	int32_t send_index = 0;
 	uint8_t buffer[8];
+#if defined(SHOOT_TEST)
+	if (send_pos_counter <= record_counter && send_pos_counter < SEND_NUM && finish_flag == 1) {
+		for (int i = 0; i < 4; i++) {
+			if(send_pos_counter < record_counter) {
+				buffer_append_int16(buffer, (int16_t)(pos_record[send_pos_counter++]), &send_index);
+				pos_record[send_pos_counter - 1] = 0;
+			} else {
+				buffer_append_int16(buffer, (int16_t)(0), &send_index);
+			}
+		}
+		comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_STATUS_5 << 8),
+			buffer, send_index, replace, 0);
+	}
+#else
 	buffer_append_int32(buffer, mc_interface_get_tachometer_value(false), &send_index);
 	buffer_append_int16(buffer, (int16_t)(mc_interface_get_input_voltage_filtered() * 1e1), &send_index);
 	buffer_append_int16(buffer, 0, &send_index); // Reserved for now
 	comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_STATUS_5 << 8),
 			buffer, send_index, replace, 0);
+#endif
 }
 
 void comm_can_send_status6(uint8_t id, bool replace) {
@@ -1652,27 +1698,27 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 				case 1:
 				case 2:
 					state_now++;
-					mc_interface_set_current(accel_current);
+//					mc_interface_set_current(accel_current);
 					break;
 				case 3:
 					state_now++;
-					mc_interface_set_pid_speed(-reset_speed);
+//					mc_interface_set_pid_speed(-reset_speed);
 					break;
 				case 4:
 					state_now++;
-					mc_interface_set_current(accel_current);
+//					mc_interface_set_current(accel_current);
 					break;
 				case 5:
 					state_now++;
-					mc_interface_set_pid_speed(1000);
+//					mc_interface_set_pid_speed(1000);
 					break;
 				case 6:
 					state_now++;
-					mc_interface_set_pid_speed(1000);
+//					mc_interface_set_pid_speed(1000);
 					break;
 				case 7:
 					state_now++;
-					mc_interface_set_pid_speed(1000);
+//					mc_interface_set_pid_speed(1000);
 					break;
 				default:
 					break;

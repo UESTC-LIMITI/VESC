@@ -21,6 +21,7 @@
 #define __HW_60_CORE_LIMITI_H__
 
 #include "stdbool.h"
+//#include "hw_60_LIMITI_core.h"
 
 #ifdef HW_IS_LIMITI_MK1
 #define HW_NAME					"60_LIMITI_MK1"
@@ -51,6 +52,7 @@
 #define DCCAL_ON()
 #define DCCAL_OFF()
 //#define IS_DRV_FAULT()			(!palReadPad(GPIOB, 7))
+
 
 #define LED_GREEN_ON()			palSetPad(GPIOB, 0)
 #define LED_GREEN_OFF()			palClearPad(GPIOB, 0)

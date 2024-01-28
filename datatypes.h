@@ -24,10 +24,12 @@
 #include <stdbool.h>
 #include "ch.h"
 
+//#define SHOOT_TEST
+//#define USE_CUSTOM_ENCODER1
 
 
 #if defined(SHOOT_TEST) //SHOOT_TEST的CUSTOM_MODE定义
-#define SEND_NUM 3000
+#define SEND_NUM 20
 typedef enum {
 	CUSTOM_MODE_NONE = 0,
 	CUSTOM_MODE_1,

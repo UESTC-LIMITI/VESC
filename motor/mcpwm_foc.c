@@ -44,10 +44,6 @@
 #include "foc_math.h"
 
 #if defined(SHOOT_TEST)  //SHOOT_TEST的计算用变量
-int mul_pos_base = 0;
-float mul_pos = 0;
-float pos_temp = 0;
-float pos_temp_pre = 0;
 int sampled_points = 0;
 uint8_t finish_flag = 0;
 float brake_pos = 0;
@@ -61,6 +57,7 @@ float reset_pos_deadband = 0.2;
 int16_t speed_record[SEND_NUM] = {0};
 int16_t pos_record[SEND_NUM] = {0};
 uint16_t record_counter = 0;
+bool can_send_enable = true;
 
 int16_t accel_counter = 0;
 float dI = 0.1;
@@ -75,9 +72,12 @@ extern float brake_current;
 extern CUSTOM_MODE custom_mode;
 extern float reset_pos_sample_points;
 extern float target_duty;
+extern uint16_t record_counter;
 
-extern int send_counter_speed;
-extern int send_counter_pos;
+extern int send_speed_counter;
+extern int send_pos_counter;
+extern bool can_send_enable;
+
 #endif
 
 // Private variables
@@ -3561,14 +3561,17 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		sampled_points = 0;
 		max_speed_record = 0;
 		max_speed_pos_record = 0;
-		send_counter_speed = 0;
-		send_counter_pos = 0;
+		send_speed_counter = 0;
+		send_pos_counter = 0;
 		record_counter = 0;
 	} else if (custom_mode == CUSTOM_MODE_1) {
 		if (finish_flag == 0) {
 			if (record_counter < SEND_NUM) {
 				speed_record[record_counter] = (int16_t)mc_interface_get_rpm();
 				pos_record[record_counter++] = (int16_t)(mul_pos * 25);
+			}
+			else {
+				can_send_enable = false;
 			}
 			switch (state_now) {
 			case 1:
@@ -3656,6 +3659,9 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 			if (record_counter < SEND_NUM) {
 				speed_record[record_counter] = (int16_t)mc_interface_get_rpm();
 				pos_record[record_counter++] = (int16_t)(mul_pos * 25);
+			}
+			else {
+
 			}
 			switch (state_now) {
 			case 1:

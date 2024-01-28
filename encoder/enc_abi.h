@@ -24,6 +24,7 @@
 #include "datatypes.h"
 #include "encoder/encoder_datatype.h"
 
+
 // Functions
 bool enc_abi_init(ABI_config_t *cfg);
 void enc_abi_deinit(ABI_config_t *cfg);

@@ -109,6 +109,13 @@ void hw_init_gpio(void) {
 	palSetPadMode(HW_HALL_ENC_GPIO2, HW_HALL_ENC_PIN2, PAL_MODE_INPUT_PULLUP);
 	palSetPadMode(HW_HALL_ENC_GPIO3, HW_HALL_ENC_PIN3, PAL_MODE_INPUT_PULLUP);  //霍尔口，要求上拉？
 
+#if defined(USE_CUSTOM_ENCODER1)
+	palSetPadMode(HW_ABI_ENC_GPIO1, HW_ABI_ENC_PIN1, PAL_MODE_INPUT_PULLUP);
+	palSetPadMode(HW_ABI_ENC_GPIO2, HW_ABI_ENC_PIN2, PAL_MODE_INPUT_PULLUP);
+	palSetPadMode(HW_ABI_ENC_GPIO3, HW_ABI_ENC_PIN3, PAL_MODE_INPUT_PULLUP);  //霍尔口，要求上拉？
+
+#endif
+
 	// Phase filters
 #ifdef PHASE_FILTER_GPIO
 	palSetPadMode(PHASE_FILTER_GPIO, PHASE_FILTER_PIN,
@@ -128,8 +135,10 @@ void hw_init_gpio(void) {
 	palSetPadMode(GPIOA, 1, PAL_MODE_INPUT_ANALOG);   //SH_B
 	palSetPadMode(GPIOA, 2, PAL_MODE_INPUT_ANALOG);   //SH_C
 	palSetPadMode(GPIOA, 3, PAL_MODE_INPUT_ANALOG);   //总线电压 3v3
+#if !defined(USE_CUSTOM_ENCODER1)
 	palSetPadMode(GPIOA, 5, PAL_MODE_INPUT_ANALOG);   //ADC_EXT1
-	palSetPadMode(GPIOA, 6, PAL_MODE_INPUT_ANALOG);   //ADC_EXT2
+	palSetPadMode(GPIOA, 6, PAL_MODE_INPUT_ANALOG);   //ADC_EXT2 端口复用 
+#endif
 
 	palSetPadMode(GPIOC, 0, PAL_MODE_INPUT_ANALOG);   //A_CURR
 	palSetPadMode(GPIOC, 1, PAL_MODE_INPUT_ANALOG);   //B_CURR
@@ -149,14 +158,18 @@ void hw_setup_adc_channels(void) {
 	// ADC1 regular channels
 	ADC_RegularChannelConfig(ADC1, ADC_Channel_10, 1, t_samp);     //A_CURR
 	ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 2, t_samp);      //SH_A  
+#if !defined(USE_CUSTOM_ENCODER1)  //端口被复用
 	ADC_RegularChannelConfig(ADC1, ADC_Channel_5, 3, t_samp);      //ADC_EXT1
+#endif
 	ADC_RegularChannelConfig(ADC1, ADC_Channel_14, 4, t_samp);     //MOTOR_TEMP
 	ADC_RegularChannelConfig(ADC1, ADC_Channel_Vrefint, 5, t_samp);//测量内部参考电压
 
 	// ADC2 regular channels
 	ADC_RegularChannelConfig(ADC2, ADC_Channel_11, 1, t_samp);     //B_CURR
 	ADC_RegularChannelConfig(ADC2, ADC_Channel_1, 2, t_samp);      //SH_B
+#if !defined(USE_CUSTOM_ENCODER1)   //端口被复用
 	ADC_RegularChannelConfig(ADC2, ADC_Channel_6, 3, t_samp);      //ADC_EXT2
+#endif
 	ADC_RegularChannelConfig(ADC2, ADC_Channel_15, 4, t_samp);     //SHUTDOWN(ADC15)
 	ADC_RegularChannelConfig(ADC2, ADC_Channel_0, 5, t_samp);      //你跑去测A_CURR干什么？
 

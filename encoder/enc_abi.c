@@ -119,11 +119,9 @@ void enc_abi_pin_isr(ABI_config_t *cfg) {
 	}
 
 #if defined (USE_CUSTOM_ENCODER1)
-#if defined (HW_IS_LIMITI_MK1) 
 	if(find_index == false) {  //更新标志位 自定义编码器用
 		find_index = true;
 		motor_stop = false;
 	}
-#endif
 #endif
 }

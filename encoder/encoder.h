@@ -38,14 +38,12 @@
 
 
 #if defined (USE_CUSTOM_ENCODER1)
-#if defined (HW_IS_LIMITI_MK1) 
 extern bool find_index;
 extern bool motor_stop;  //custom编码器标志位
 //自定义编码器回调函数
 float custom_as5047_read_deg (void);
 bool custom_as5047_fault_check(void);
 char* custom_as5047_print_info(void);
-#endif
 #endif
 
 // Functions
@@ -72,5 +70,9 @@ void encoder_check_faults(volatile mc_configuration *m_conf, bool is_second_moto
 // Interrupt handlers
 void encoder_pin_isr(void);
 void encoder_tim_isr(void);
+
+//自己加的编码器多圈计算，在routine里跑自动计算多圈
+static void encoder_multiturn_calc(void);
+float encoder_get_multiturn(void);
 
 #endif /* ENCODER_ENCODER_H_ */
