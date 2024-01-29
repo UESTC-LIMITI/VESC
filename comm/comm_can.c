@@ -1193,9 +1193,12 @@ CANRxFrame *comm_can_get_rx_frame(int interface) {
 //float* convert_p;
 
 void custom_append_float(uint8_t* buffer, float value, int32_t* index) {
-	uint32_t temp = (uint32_t)value;
-	for(int i = 3; i >= 0; i++) {
-		buffer[((*index)++) + i] = (temp >>(3-i)*8) & 0xff;
+	uint32_t temp = 0;
+	uint32_t* temp_p = &temp;
+	float* value_p = &value;
+	memcpy(temp_p, value_p, 4);
+	for(int i = 3; i >= 0; i--) {
+		buffer[(*index)++] = (temp >> (i*8)) & 0xff;
 	}
 }
 #endif
@@ -1208,8 +1211,7 @@ void comm_can_send_status1(uint8_t id, bool replace) {  //can status 状态消�
 	custom_append_float(buffer, (float)mc_interface_get_duty_cycle_now(), &send_index);
 #else
 	buffer_append_int32(buffer, (int32_t)mc_interface_get_rpm(), &send_index);
-	buffer_append_int16(buffer, (int16_t)(mc_interface_get_tot_current_filtered() * 1e1), &send_index);
-	buffer_append_int16(buffer, (int16_t)(mc_interface_get_duty_cycle_now() * 1e3), &send_index);
+	buffer_append_int32(buffer, (int16_t)(mc_interface_get_duty_cycle_now() * 1e3), &send_index);
 #endif
 	comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_STATUS << 8),
 			buffer, send_index, replace, 0);
@@ -1222,8 +1224,8 @@ void comm_can_send_status2(uint8_t id, bool replace) {
 	custom_append_float(buffer, (float)mc_interface_get_pid_pos_now(), &send_index);
 	custom_append_float(buffer, (float)encoder_get_multiturn(), &send_index);
 #else
-	buffer_append_int32(buffer, (int32_t)(mc_interface_get_amp_hours(false) * 1e4), &send_index);
-	buffer_append_int32(buffer, (int32_t)(mc_interface_get_amp_hours_charged(false) * 1e4), &send_index);
+	buffer_append_int32(buffer, (int32_t)(mc_interface_get_pid_pos_now() * 1e6), &send_index);
+	buffer_append_int32(buffer, (int32_t)(encoder_get_multiturn() * 1e6), &send_index);
 #endif
 	comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_STATUS_2 << 8),
 			buffer, send_index, replace, 0);
@@ -1236,8 +1238,8 @@ void comm_can_send_status3(uint8_t id, bool replace) {
 	custom_append_float(buffer, (float)mc_interface_get_tot_current_in_filtered(), &send_index);
 	custom_append_float(buffer, (float)mc_interface_get_input_voltage_filtered(), &send_index);
 #else
-	buffer_append_int32(buffer, (int32_t)(mc_interface_get_watt_hours(false) * 1e4), &send_index);
-	buffer_append_int32(buffer, (int32_t)(mc_interface_get_watt_hours_charged(false) * 1e4), &send_index);
+	buffer_append_int32(buffer, (int32_t)(mc_interface_get_tot_current_in_filtered() * 1e3), &send_index);
+	buffer_append_int32(buffer, (int32_t)(mc_interface_get_input_voltage_filtered() * 1e3), &send_index);
 #endif
 	comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_STATUS_3 << 8),
 			buffer, send_index, replace, 0);
