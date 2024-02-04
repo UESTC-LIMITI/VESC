@@ -153,7 +153,7 @@ void hw_init_gpio(void) {
 	DAC->DHR12R1 = 2047;
 #endif
 
-	drv8301_init();
+	//drv8301_init();
 
 #if defined(HW60_IS_MK3) || defined(HW60_IS_MK4) || defined(HW60_IS_MK5) || defined(HW60_IS_MK6)
 	terminal_register_command_callback(

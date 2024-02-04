@@ -378,6 +378,9 @@ void encoder_deinit(void) {
 		enc_as5x47u_deinit(&encoder_cfg_as5x47u);
 	} else if (m_encoder_type_now == ENCODER_TYPE_BISSC) {
 		enc_bissc_deinit(&encoder_cfg_bissc);
+	} else if (m_encoder_type_now == ENCODER_TYPE_CUSTOM) {
+		enc_as504x_deinit(&encoder_cfg_as504x);
+		enc_abi_deinit(&encoder_cfg_ABI);
 	}
 
 	m_encoder_type_now = ENCODER_TYPE_NONE;
@@ -413,8 +416,6 @@ void encoder_set_custom_callbacks (   //可以自己写自己的编码器
  * 
  */
 /**************************************************************************************************/
-bool find_index = false;
-bool motor_stop = true;
 bool custom_encoder_fault = false;
 uint8_t custom_encoder_fault_count = 0;
 uint8_t stop_count = 0;
@@ -422,34 +423,20 @@ uint8_t diff_fault_count = 0;
 float last_ABS_ang = 0;
 float last_ABI_ang = 0;
 //bool get_diff = false;
-float ABS_ABI_diff = 0;
-float ABS_ABI_diff_last = 0;
-
-#define multiturn_convert(x) x = x > 180 ? (360 - x) : x
 
 float custom_as5047_read_deg (void) {
 	float ABS_ang = AS504x_LAST_ANGLE(&encoder_cfg_as504x);
 	float ABI_ang = enc_abi_read_deg(&encoder_cfg_ABI);
-	float dtheta = ABI_ang - last_ABI_ang;  
 	float res = 0;
 
-	ABS_ABI_diff = fabs(ABS_ang - ABI_ang);
-	multiturn_convert(ABS_ABI_diff);
 	//get_diff = true;
 
-	if (find_index == true) {
-		res = last_ABS_ang + dtheta;  //当前低延迟角度 = 上次绝对值 + 上次与这次相对值角度误差
+	if (encoder_cfg_ABI.state.index_found == true) {
+//		res = last_ABS_ang + dtheta;  //当前低延迟角度 = 上次绝对值 + 上次与这次相对值角度误差
+		res = ABI_ang;  //同一个AS5047 ABI输出和SPI输出的零位置似乎是一样的 之后直接用ABI的输出就行
 	}
 	else {
 		res = ABS_ang;
-	}
-	if (dtheta < 0.01f) {   //检测电机停止
-		stop_count++;
-		if (stop_count > 10) {
-			find_index = false;  //试行，再启动需要重新依据绝对位置寻找Index
-			stop_count = 0;
-			motor_stop = true;
-		}
 	}
 
 	last_ABS_ang = ABS_ang;
@@ -457,14 +444,7 @@ float custom_as5047_read_deg (void) {
 	return res;
 }
 
-bool custom_as5047_fault_check(void) {
-	if (fabsf(diff_fault_count - ABS_ABI_diff_last) > 1.0f) {  //相对值绝对值误差变化大于1°，连续5次就报错
-		custom_encoder_fault_count++;
-		if (custom_encoder_fault_count > 5) {
-			return true;
-			custom_encoder_fault_count = 0;
-		}
-	}
+bool custom_as5047_fault_check(void) {  //只有SPI会出问题，和SPI的一模一样
 	return false;
 }
 
@@ -710,9 +690,20 @@ void encoder_check_faults(volatile mc_configuration *m_conf, bool is_second_moto
 			break;
 
 		case SENSOR_PORT_MODE_CUSTOM_ENCODER:
-			if (m_enc_custom_fault) {
-				if (m_enc_custom_fault()) {
-					mc_interface_fault_stop(FAULT_CODE_ENCODER_FAULT, is_second_motor, false);
+			if (encoder_cfg_as504x.state.spi_error_rate > 0.05) {
+				mc_interface_fault_stop(FAULT_CODE_ENCODER_SPI, is_second_motor, false);
+			}
+
+			if (encoder_cfg_as504x.sw_spi.mosi_gpio != NULL) {   //由于磁性和连接导致的错误
+				AS504x_diag diag2 = encoder_cfg_as504x.state.sensor_diag;
+				if (!diag2.is_connected) {
+					mc_interface_fault_stop(FAULT_CODE_ENCODER_SPI, is_second_motor, false);
+				}
+
+				if (diag2.is_Comp_high) {
+					mc_interface_fault_stop(FAULT_CODE_ENCODER_NO_MAGNET, is_second_motor, false);
+				} else if(diag2.is_Comp_low) {
+					mc_interface_fault_stop(FAULT_CODE_ENCODER_MAGNET_TOO_STRONG, is_second_motor, false);
 				}
 			}
 			break;
@@ -939,6 +930,10 @@ static THD_FUNCTION(routine_thread, arg) {    //开了一个线程，自动执�
 
 		case ENCODER_TYPE_BISSC:
 			enc_bissc_routine(&encoder_cfg_bissc);
+			break;
+
+		case ENCODER_TYPE_CUSTOM:
+			enc_as504x_routine(&encoder_cfg_as504x);
 			break;
 
 		default:

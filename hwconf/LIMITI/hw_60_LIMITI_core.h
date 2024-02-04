@@ -18,13 +18,16 @@
     */
 
 #ifndef __HW_60_CORE_LIMITI_H__
-#define __HW_60_CORE_LIMITI_H__
+#define __HW_60_CORE_LIMITI_H__ 
 
-#include "stdbool.h"
+//#include "stdbool.h"
 //#include "hw_60_LIMITI_core.h"
+#include "hw.h"
 
 #ifdef HW_IS_LIMITI_MK1
 #define HW_NAME					"60_LIMITI_MK1"
+#elif defined(HW_IS_LIMITI_MK2)
+#define HW_NAME					"60_LIMITI_MK2"
 #else
 #error "Must include hardware type"
 #endif
@@ -33,27 +36,18 @@
 #define HW_MINOR				1
 
 // HW properties
-//#define HW_HAS_DRV8301
+#define HW_HAS_DRV8301
 #define HW_HAS_3_SHUNTS
 //#define HW_HAS_PHASE_SHUNTS
-#if !defined(HW_IS_LIMITI_MK1)
-#define HW_HAS_PERMANENT_NRF
-#endif
-
 
 // Macros
-#ifdef HW60_VEDDER_FIRST_PCB
-#define ENABLE_GATE()			palSetPad(GPIOB, 6)
-#define DISABLE_GATE()			palClearPad(GPIOB, 6)
-#else
 #define ENABLE_GATE()			palSetPad(GPIOB, 5)
 #define DISABLE_GATE()			palClearPad(GPIOB, 5)
-#endif
+
+
 #define DCCAL_ON()
 #define DCCAL_OFF()
-#if defined(HW_HAS_DRV8301)
 #define IS_DRV_FAULT()			(!palReadPad(GPIOB, 7))
-#endif
 
 #define LED_GREEN_ON()			palSetPad(GPIOB, 0)
 #define LED_GREEN_OFF()			palClearPad(GPIOB, 0)
@@ -71,23 +65,8 @@
 #define PHASE_FILTER_ON()		palSetPad(PHASE_FILTER_GPIO, PHASE_FILTER_PIN)
 #define PHASE_FILTER_OFF()		palClearPad(PHASE_FILTER_GPIO, PHASE_FILTER_PIN) //没有PHASE_FILTER
 #endif
-#endif
 
-//#if defined (HW_IS_LIMITI_MK1)   //小改动，尝试注释所有关于shutdown的代码
-// Shutdown pin
-//#define HW_SHUTDOWN_GPIO		GPIOC
-//#define HW_SHUTDOWN_PIN			5
-//#define HW_SHUTDOWN_HOLD_ON()	palSetPad(HW_SHUTDOWN_GPIO, HW_SHUTDOWN_PIN)
-//#define HW_SHUTDOWN_HOLD_OFF()	palClearPad(HW_SHUTDOWN_GPIO, HW_SHUTDOWN_PIN)   //shutdown 是什么东西
-//#define HW_SAMPLE_SHUTDOWN()	hw_sample_shutdown_button()
 
-// Hold shutdown pin early to wake up on short pulses
-//#else
-// Switch on current filter if a permanent
-// NRF24 cannot be found, as the later
-// HW60 has changed one of the permanent NRF
-// pins to the current filter activation pin.
-//#endif
 
 /*
  * ADC Vector
@@ -126,9 +105,7 @@
 #define ADC_IND_TEMP_MOS		8
 #define ADC_IND_TEMP_MOTOR		9
 #define ADC_IND_VREFINT			12
-#if defined (HW_IS_LIMITI_MK1)
-#define ADC_IND_SHUTDOWN		10
-#endif
+//#define ADC_IND_SHUTDOWN		10
 
 //#define ADC_IND_I_OVERSAMP		15
 
@@ -185,7 +162,7 @@
 #endif
 
 // Input voltage
-#define GET_INPUT_VOLTAGE()		((V_REG / 4095.0) * (float)ADC_Value[ADC_IND_VIN_SENS] * ((VIN_R1 + VIN_R2) / VIN_R2))  //取ADC_Value[11],还与VIN电阻有关
+#define GET_INPUT_VOLTAGE()		((V_REG / 4095.0) * (float)ADC_Value[ADC_IND_VIN_SENS] * ((VIN_R1 + VIN_R2) / VIN_R2))
 
 // NTC Termistors  //热敏电阻的采样
 #define NTC_RES(adc_val)		((4095.0 * 10000.0) / adc_val - 10000.0)
@@ -209,7 +186,7 @@
 #define CURR3_DOUBLE_SAMPLE		0
 #endif
 
-// COMM-port ADC GPIOs    //外部ADC 用不到吧
+// COMM-port ADC GPIOs
 #define HW_ADC_EXT_GPIO			GPIOA
 #define HW_ADC_EXT_PIN			5
 #define HW_ADC_EXT2_GPIO		GPIOA
@@ -223,7 +200,7 @@
 #define HW_UART_RX_PORT			GPIOB
 #define HW_UART_RX_PIN			11
 
-//#if defined (HW_IS_LIMITI_MK1)   //NRF可以挂在UART上？ 另一个UART口
+#if defined(HW_IS_LIMITI_MK1) || defined(HW_IS_LIMITI_MK2)   //NRF可以挂在UART上？ 另一个UART口
 // Permanent UART Peripheral (for NRF51)
 #define HW_UART_P_BAUD			115200
 #define HW_UART_P_DEV			SD4
@@ -233,9 +210,9 @@
 #define HW_UART_P_TX_PIN		12 // This is a mistake in the HW. We have to use a hack to use UART5.
 #define HW_UART_P_RX_PORT		GPIOC
 #define HW_UART_P_RX_PIN		11
-//#endif
+#endif
 
-// ICU Peripheral for servo decoding  //舵机的timer？用不到
+// ICU Peripheral for servo decoding
 #define HW_USE_SERVO_TIM4
 #define HW_ICU_TIMER			TIM4
 #define HW_ICU_TIM_CLK_EN()		RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE)
@@ -245,7 +222,7 @@
 #define HW_ICU_GPIO				GPIOB
 #define HW_ICU_PIN				6
 
-// I2C Peripheral               //I2C有毛用
+// I2C Peripheral
 #define HW_I2C_DEV				I2CD2
 #define HW_I2C_GPIO_AF			GPIO_AF_I2C2
 #define HW_I2C_SCL_PORT			GPIOB
@@ -261,11 +238,24 @@
 #define HW_ABI_ENC_PIN2			7
 #define HW_ABI_ENC_GPIO3		GPIOA    //I
 #define HW_ABI_ENC_PIN3			5
+/*
 #define HW_ABI_EXTI_PORTSRC		EXTI_PortSourceGPIOA
 #define HW_ABI_EXTI_PINSRC		EXTI_PinSource5
 #define HW_ABI_EXTI_CH			EXTI9_5_IRQn
 #define HW_ABI_EXTI_LINE		EXTI_Line5
 #define HW_ABI_EXTI_ISR_VEC		EXTI9_5_IRQHandler
+*/
+#define HW_ENC_EXTI_PORTSRC		EXTI_PortSourceGPIOA
+#define HW_ENC_EXTI_PINSRC		EXTI_PinSource5
+#define HW_ENC_EXTI_CH			EXTI9_5_IRQn
+#define HW_ENC_EXTI_LINE		EXTI_Line5
+#define HW_ENC_EXTI_ISR_VEC		EXTI9_5_IRQHandler
+#else
+#define HW_ENC_EXTI_PORTSRC		EXTI_PortSourceGPIOC
+#define HW_ENC_EXTI_PINSRC		EXTI_PinSource8
+#define HW_ENC_EXTI_CH			EXTI9_5_IRQn
+#define HW_ENC_EXTI_LINE		EXTI_Line8
+#define HW_ENC_EXTI_ISR_VEC		EXTI9_5_IRQHandler
 #endif
 //原始配置
 #define HW_HALL_ENC_GPIO1		GPIOC
@@ -274,21 +264,15 @@
 #define HW_HALL_ENC_PIN2		7
 #define HW_HALL_ENC_GPIO3		GPIOC
 #define HW_HALL_ENC_PIN3		8
-#define HW_ENC_EXTI_PORTSRC		EXTI_PortSourceGPIOC
-#define HW_ENC_EXTI_PINSRC		EXTI_PinSource8
-#define HW_ENC_EXTI_CH			EXTI9_5_IRQn
-#define HW_ENC_EXTI_LINE		EXTI_Line8
-#define HW_ENC_EXTI_ISR_VEC		EXTI9_5_IRQHandler
    
-
 #define HW_ENC_TIM				TIM3
 #define HW_ENC_TIM_AF			GPIO_AF_TIM3   //timer3作为所有编码器的定时计数基准？（如果有需要）
 #define HW_ENC_TIM_CLK_EN()		RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE)
 #define HW_ENC_TIM_ISR_CH		TIM3_IRQn
 #define HW_ENC_TIM_ISR_VEC		TIM3_IRQHandler
 
-// SPI pins                     //感觉用不到
-#if defined (HW_IS_LIMITI_MK1)
+// SPI pins
+#if defined(HW_IS_LIMITI_MK1) || defined(HW_IS_LIMITI_MK2)
 #define HW_SPI_DEV				SPID1
 #define HW_SPI_GPIO_AF			GPIO_AF_SPI1
 #define HW_SPI_PORT_NSS			GPIOB
@@ -299,10 +283,21 @@
 #define HW_SPI_PIN_MOSI			7
 #define HW_SPI_PORT_MISO		GPIOA
 #define HW_SPI_PIN_MISO			6
+#else
+#define HW_SPI_DEV				SPID1
+#define HW_SPI_GPIO_AF			GPIO_AF_SPI1
+#define HW_SPI_PORT_NSS			GPIOA
+#define HW_SPI_PIN_NSS			4
+#define HW_SPI_PORT_SCK			GPIOA
+#define HW_SPI_PIN_SCK			5
+#define HW_SPI_PORT_MOSI		GPIOA
+#define HW_SPI_PIN_MOSI			7
+#define HW_SPI_PORT_MISO		GPIOA
+#define HW_SPI_PIN_MISO			6
 #endif
 
+// SPI for DRV8301  //DRV8301的SPI
 #if defined(HW_HAS_DRV8301)
-// SPI for DRV8301              //DRV8301的SPI
 #define DRV8301_MOSI_GPIO		GPIOB
 #define DRV8301_MOSI_PIN		4
 #define DRV8301_MISO_GPIO		GPIOB
@@ -314,8 +309,25 @@
 #endif
 
 // MPU9250  //惯导模块端口定义，用不到
-/*
+/* 
 #if defined (HW_IS_LIMITI_MK1)
+#define MPU9X50_SDA_GPIO		GPIOB
+#define MPU9X50_SDA_PIN			2
+#define MPU9X50_SCL_GPIO		GPIOA
+#define MPU9X50_SCL_PIN			15
+#define IMU_FLIP
+#elif defined(HW60_IS_MK6)
+#define BMI160_SPI_PORT_NSS		GPIOA
+#define BMI160_SPI_PIN_NSS		15
+#define BMI160_SPI_PORT_SCK		GPIOC
+#define BMI160_SPI_PIN_SCK		15
+#define BMI160_SPI_PORT_MOSI	GPIOB
+#define BMI160_SPI_PIN_MOSI		2
+#define BMI160_SPI_PORT_MISO	GPIOB
+#define BMI160_SPI_PIN_MISO		12
+#define IMU_FLIP
+#define IMU_ROT_180
+#else
 #define BMI160_SDA_GPIO			GPIOB
 #define BMI160_SDA_PIN			2
 #define BMI160_SCL_GPIO			GPIOA
@@ -325,13 +337,15 @@
 #endif
 */
 
-#if defined(HW_IS_LIMITI_MK1)   //用不到
+/*
+#if defined(HW_IS_LIMITI_MK1) || defined(HW_IS_LIMITI_MK2)   //用不到
 // NRF SWD
 #define NRF5x_SWDIO_GPIO		GPIOB
 #define NRF5x_SWDIO_PIN			12
 #define NRF5x_SWCLK_GPIO		GPIOA
 #define NRF5x_SWCLK_PIN			4
 #endif
+*/
 
 // Measurement macros    //三个采样ADC的定义，直接测电压而不是上面可选的测电流的ADC
 #define ADC_V_L1				ADC_Value[ADC_IND_SENS1]
@@ -359,23 +373,23 @@
 #endif
 
 // Setting limits
+#ifdef HW60_IS_HP
+#define HW_LIM_CURRENT			-160.0, 160.0
+#define HW_LIM_CURRENT_IN		-160.0, 160.0
+#define HW_LIM_CURRENT_ABS		0.0, 240.0
+#ifndef MCCONF_M_DRV8301_OC_ADJ
+#define MCCONF_M_DRV8301_OC_ADJ	19 // DRV8301 over current protection threshold
+#endif
+#else
 #define HW_LIM_CURRENT			-120.0, 120.0
 #define HW_LIM_CURRENT_IN		-120.0, 120.0
 #define HW_LIM_CURRENT_ABS		0.0, 160.0
+#endif
 #define HW_LIM_VIN				6.0, 57.0         //最大支持57V电压 （DRV8301：流汗
 #define HW_LIM_ERPM				-200e3, 200e3
 #define HW_LIM_DUTY_MIN			0.0, 0.1
 #define HW_LIM_DUTY_MAX			0.0, 0.99     //占空比限制在 0.1 ~ 0.99 不在范围内都没法转？
 #define HW_LIM_TEMP_FET			-40.0, 110.0  //mos温控，林哥版本上有没有呢？
 
-#if defined(HW_HAS_DRV8301)
-#ifndef MCCONF_M_DRV8301_OC_ADJ
-#define MCCONF_M_DRV8301_OC_ADJ	19 // DRV8301 over current protection threshold
-#endif
-
-// Functions
-//#if defined (HW_IS_LIMITI_MK1)   //小改动，尝试注释所有关于shutdown的代码
-//bool hw_sample_shutdown_button(void);
-//#endif
 
 #endif /* HW_60_CORE_H_ */

@@ -21,20 +21,20 @@
 #include "hal.h"
 #include "stm32f4xx_conf.h"
 #include "utils_math.h"
+#include "drv8301.h"
 #include "terminal.h"
 #include "commands.h"
 #include "mc_interface.h"
 
-//一些硬件的使用
-#if defined(HW_HAS_DRV8301) 
-#include "drv8301.h"
-#endif
-
 // Variables
 static volatile bool i2c_running = false;
+
+/* 
 #if defined(HW_IS_LIMITI_MK1)
-//static float bt_diff = 0.0;
+static mutex_t shutdown_mutex;
+static float bt_diff = 0.0;
 #endif
+*/
 
 // I2C configuration
 static const I2CConfig i2cfg = {
@@ -43,16 +43,19 @@ static const I2CConfig i2cfg = {
 		STD_DUTY_CYCLE
 };
 
-//#if defined(HW_IS_LIMITI_MK1)
-//static void terminal_shutdown_now(int argc, const char **argv);
-//static void terminal_button_test(int argc, const char **argv);
-//#endif
+/* 
+#if defined(HW_IS_LIMITI_MK1)
+static void terminal_shutdown_now(int argc, const char **argv);
+static void terminal_button_test(int argc, const char **argv);
+#endif
+*/
 
 void hw_init_gpio(void) {
+/* 
 #if !defined(HW_IS_LIMITI_MK1)  
 	chMtxObjectInit(&shutdown_mutex);
 #endif
-
+*/
 	// GPIO clock enable
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
@@ -75,13 +78,11 @@ void hw_init_gpio(void) {
 	ENABLE_GATE();
 
 	// Current filter
-	/*
 	palSetPadMode(GPIOD, 2,
 			PAL_MODE_OUTPUT_PUSHPULL |
 			PAL_STM32_OSPEED_HIGHEST);
 
 	CURRENT_FILTER_OFF();
-	*/
 
 	// GPIOA Configuration: Channel 1 to 3 as alternate function push-pull
 	palSetPadMode(GPIOA, 8, PAL_MODE_ALTERNATE(GPIO_AF_TIM1) |
@@ -90,9 +91,9 @@ void hw_init_gpio(void) {
 	palSetPadMode(GPIOA, 9, PAL_MODE_ALTERNATE(GPIO_AF_TIM1) |
 			PAL_STM32_OSPEED_HIGHEST |
 			PAL_STM32_PUDR_FLOATING);
-	palSetPadMode(GPIOA, 10, PAL_MODE_ALTERNATE(GPIO_AF_TIM1) | 
+	palSetPadMode(GPIOA, 10, PAL_MODE_ALTERNATE(GPIO_AF_TIM1) |
 			PAL_STM32_OSPEED_HIGHEST |
-			PAL_STM32_PUDR_FLOATING);                           //PWM高侧输出
+			PAL_STM32_PUDR_FLOATING);
 
 	palSetPadMode(GPIOB, 13, PAL_MODE_ALTERNATE(GPIO_AF_TIM1) |
 			PAL_STM32_OSPEED_HIGHEST |
@@ -102,18 +103,16 @@ void hw_init_gpio(void) {
 			PAL_STM32_PUDR_FLOATING);
 	palSetPadMode(GPIOB, 15, PAL_MODE_ALTERNATE(GPIO_AF_TIM1) |
 			PAL_STM32_OSPEED_HIGHEST |
-			PAL_STM32_PUDR_FLOATING);                           //PWM低侧输出
+			PAL_STM32_PUDR_FLOATING);
 
-	// Hall sensors                                            
+	// Hall sensors
 	palSetPadMode(HW_HALL_ENC_GPIO1, HW_HALL_ENC_PIN1, PAL_MODE_INPUT_PULLUP);
 	palSetPadMode(HW_HALL_ENC_GPIO2, HW_HALL_ENC_PIN2, PAL_MODE_INPUT_PULLUP);
-	palSetPadMode(HW_HALL_ENC_GPIO3, HW_HALL_ENC_PIN3, PAL_MODE_INPUT_PULLUP);  //霍尔口，要求上拉？
-
+	palSetPadMode(HW_HALL_ENC_GPIO3, HW_HALL_ENC_PIN3, PAL_MODE_INPUT_PULLUP);
 #if defined(USE_CUSTOM_ENCODER1)
 	palSetPadMode(HW_ABI_ENC_GPIO1, HW_ABI_ENC_PIN1, PAL_MODE_INPUT_PULLUP);
 	palSetPadMode(HW_ABI_ENC_GPIO2, HW_ABI_ENC_PIN2, PAL_MODE_INPUT_PULLUP);
-	palSetPadMode(HW_ABI_ENC_GPIO3, HW_ABI_ENC_PIN3, PAL_MODE_INPUT_PULLUP);  //霍尔口，要求上拉？
-
+	palSetPadMode(HW_ABI_ENC_GPIO3, HW_ABI_ENC_PIN3, PAL_MODE_INPUT_PULLUP);
 #endif
 
 	// Phase filters
@@ -124,33 +123,64 @@ void hw_init_gpio(void) {
 	PHASE_FILTER_OFF();
 #endif
 
-#if defined(HW_IS_LIMITI_MK1)
+// Sensor port voltage
+/* 
+#if defined(HW60_IS_MK6)
+	SENSOR_PORT_3V3();
+	palSetPadMode(SENSOR_VOLTAGE_GPIO, SENSOR_VOLTAGE_PIN,
+			PAL_MODE_OUTPUT_PUSHPULL | PAL_STM32_OSPEED_HIGHEST);
+#endif
+*/
+
 	// Fault pin
+#if defined(HW_HAS_DRV8301)	// Fault pin
 	palSetPadMode(GPIOB, 7, PAL_MODE_INPUT_PULLUP);   //DRV nFault脚
 #endif
-
 
 	// ADC Pins
 	palSetPadMode(GPIOA, 0, PAL_MODE_INPUT_ANALOG);   //SH_A
 	palSetPadMode(GPIOA, 1, PAL_MODE_INPUT_ANALOG);   //SH_B
 	palSetPadMode(GPIOA, 2, PAL_MODE_INPUT_ANALOG);   //SH_C
 	palSetPadMode(GPIOA, 3, PAL_MODE_INPUT_ANALOG);   //总线电压 3v3
-#if !defined(USE_CUSTOM_ENCODER1)
+//#if !defined(USE_CUSTOM_ENCODER1)
 	palSetPadMode(GPIOA, 5, PAL_MODE_INPUT_ANALOG);   //ADC_EXT1
 	palSetPadMode(GPIOA, 6, PAL_MODE_INPUT_ANALOG);   //ADC_EXT2 端口复用 
-#endif
+//#endif
 
 	palSetPadMode(GPIOC, 0, PAL_MODE_INPUT_ANALOG);   //A_CURR
 	palSetPadMode(GPIOC, 1, PAL_MODE_INPUT_ANALOG);   //B_CURR
 	palSetPadMode(GPIOC, 2, PAL_MODE_INPUT_ANALOG);   //C_CURR
 	palSetPadMode(GPIOC, 3, PAL_MODE_INPUT_ANALOG);   //总线电压 24V
+//#if !defined(USE_CUSTOM_ENCODER1)
 	palSetPadMode(GPIOC, 4, PAL_MODE_INPUT_ANALOG);   //电机温控
-#if !defined(HW_IS_LIMITI_MK1)
-	palSetPadMode(GPIOC, 5, PAL_MODE_INPUT_ANALOG);   //shutdown口 和 DRVinit 没用
+//#endif
+#if defined(HW_HAS_DRV8301)
 	drv8301_init();
 #endif
+/* 
+#if !defined(HW_IS_LIMITI_MK1)
+	palSetPadMode(GPIOC, 5, PAL_MODE_INPUT_ANALOG);   //shutdown口 没用
+#endif
+*/
 
+/* 
+#if defined(HW_HAS_DRV8301)
+	terminal_register_command_callback(
+		"shutdown",
+		"Shutdown VESC now.",
+		0,
+		terminal_shutdown_now);
+
+	terminal_register_command_callback(
+		"test_button",
+		"Try sampling the shutdown button",
+		0,
+		terminal_button_test);
+#endif
+*/
 }
+
+
 
 void hw_setup_adc_channels(void) {
 	uint8_t t_samp = ADC_SampleTime_15Cycles;
@@ -190,15 +220,14 @@ void hw_setup_adc_channels(void) {
 	// Injected channels
 	ADC_InjectedChannelConfig(ADC1, ADC_Channel_10, 1, t_samp);
 	ADC_InjectedChannelConfig(ADC2, ADC_Channel_11, 1, t_samp);
-	ADC_InjectedChannelConfig(ADC3, ADC_Channel_12, 1, t_samp);   
+	ADC_InjectedChannelConfig(ADC3, ADC_Channel_12, 1, t_samp);
 	ADC_InjectedChannelConfig(ADC1, ADC_Channel_10, 2, t_samp);
 	ADC_InjectedChannelConfig(ADC2, ADC_Channel_11, 2, t_samp);
-	ADC_InjectedChannelConfig(ADC3, ADC_Channel_12, 2, t_samp);   
+	ADC_InjectedChannelConfig(ADC3, ADC_Channel_12, 2, t_samp);
 	ADC_InjectedChannelConfig(ADC1, ADC_Channel_10, 3, t_samp);
 	ADC_InjectedChannelConfig(ADC2, ADC_Channel_11, 3, t_samp);
 	ADC_InjectedChannelConfig(ADC3, ADC_Channel_12, 3, t_samp);   //重要的三相电流采样
 }
-
 /*
 数据在数组中顺序：
 规则通道数据：
@@ -230,8 +259,9 @@ ADC1 - Channel 10 (Injected 3)
 ADC2 - Channel 11 (Injected 3)
 ADC3 - Channel 12 (Injected 3)
 这意味着在数组中，首先是规则通道1的数据，接着是注入通道1的数据，然后是规则通道2的数据，注入通道2的数据，规则通道3的数据，注入通道3的数据，以此类推。数据的存储顺序是根据通道配置的顺序交替进行的。
-
 */ 
+
+
 
 void hw_start_i2c(void) {
 	i2cAcquireBus(&HW_I2C_DEV);
@@ -327,8 +357,8 @@ void hw_try_restore_i2c(void) {
 	}
 }
 
-#if defined(HW_IS_LIMITI_MK1)
 /*
+#if defined(HW_IS_LIMITI_MK1)
 bool hw_sample_shutdown_button(void) {
 	chMtxLock(&shutdown_mutex);
 
@@ -367,5 +397,5 @@ static void terminal_button_test(int argc, const char **argv) {
 		chThdSleepMilliseconds(100);
 	}
 }
-*/
 #endif
+*/

@@ -38,8 +38,6 @@
 
 
 #if defined (USE_CUSTOM_ENCODER1)
-extern bool find_index;
-extern bool motor_stop;  //custom编码器标志位
 //自定义编码器回调函数
 float custom_as5047_read_deg (void);
 bool custom_as5047_fault_check(void);

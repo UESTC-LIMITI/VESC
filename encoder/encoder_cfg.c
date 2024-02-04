@@ -119,18 +119,12 @@ ABI_config_t encoder_cfg_ABI = {   //对ABI编码器的引脚设置，直接在h
 #endif
 		HW_ENC_TIM,
 		HW_ENC_TIM_AF,
-#if defined (USE_CUSTOM_ENCODER1)
-		HW_ABI_EXTI_PORTSRC,
-		HW_ABI_EXTI_PINSRC,
-		HW_ABI_EXTI_LINE,
-		HW_ABI_EXTI_CH,
 
-#else
 		HW_ENC_EXTI_PORTSRC,
 		HW_ENC_EXTI_PINSRC,
 		HW_ENC_EXTI_LINE,
 		HW_ENC_EXTI_CH,
-#endif
+
 		{0, 0}, // State
 };
 
