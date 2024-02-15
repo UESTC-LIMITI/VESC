@@ -1701,27 +1701,27 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 				case 1:
 				case 2:
 					state_now++;
-//					mc_interface_set_current(accel_current);
+					mc_interface_set_current(accel_current);
 					break;
 				case 3:
 					state_now++;
-//					mc_interface_set_pid_speed(-reset_speed);
+					mc_interface_set_pid_speed(-reset_speed);
 					break;
 				case 4:
 					state_now++;
-//					mc_interface_set_current(accel_current);
+					mc_interface_set_current(accel_current);
 					break;
 				case 5:
 					state_now++;
-//					mc_interface_set_pid_speed(1000);
+					mc_interface_set_pid_speed(1000);
 					break;
 				case 6:
 					state_now++;
-//					mc_interface_set_pid_speed(1000);
+					mc_interface_set_pid_speed(1000);
 					break;
 				case 7:
 					state_now++;
-//					mc_interface_set_pid_speed(1000);
+					mc_interface_set_pid_speed(1000);
 					break;
 				default:
 					break;

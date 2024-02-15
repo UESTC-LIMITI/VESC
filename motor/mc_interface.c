@@ -646,7 +646,7 @@ void mc_interface_set_pid_pos(float pos) {
 		}
 	}
 
-	utils_norm_angle(&pos);
+	utils_norm_angle(&pos);  //就是这里导致了只能转单圈
 
 	switch (conf->motor_type) {
 	case MOTOR_TYPE_BLDC:
@@ -3033,3 +3033,19 @@ unsigned mc_interface_calc_crc(mc_configuration* conf_in, bool is_motor_2) {
 	conf->crc = crc_old;
 	return crc_new;
 }
+
+
+/**
+ * 自定义函数定义开始
+ */
+/**************************************************************************************************/
+/**
+ * @description: 读取多圈（编码器）
+ * @param {return} encoder_get_multiturn
+ * @return {*}
+ */
+float mc_interface_get_pos_multiturn(void) {
+	return encoder_get_multiturn();
+}
+
+/**************************************************************************************************/

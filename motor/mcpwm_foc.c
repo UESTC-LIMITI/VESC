@@ -824,7 +824,7 @@ void mcpwm_foc_set_current(float current) {
 	}
 }
 
-void mcpwm_foc_release_motor(void) {
+void mcpwm_foc_release_motor(void) {  //释放电机的方式直接设置QD轴电流为0
 	get_motor_now()->m_control_mode = CONTROL_MODE_CURRENT;
 	get_motor_now()->m_iq_set = 0.0;
 	get_motor_now()->m_id_set = 0.0;
@@ -3540,6 +3540,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 
 #if defined(SHOOT_TEST)  //SHOOT_TEST 主要功能执行函数段
 	// Calculate the position of multiple turns
+/* 
 	pos_temp = mc_interface_get_pid_pos_now();
 	if (pos_temp > 270 && pos_temp_pre < 90)
 		mul_pos_base -= 360;
@@ -3547,7 +3548,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		mul_pos_base += 360;
 	pos_temp_pre = pos_temp;
 	mul_pos = mul_pos_base + pos_temp;
-
+*/
+	float mul_pos = mc_interface_get_pos_multiturn();
 	// Record max speed
 	if (mc_interface_get_rpm() > max_speed_record) {
 		max_speed_record = mc_interface_get_rpm();
@@ -3564,6 +3566,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		send_speed_counter = 0;
 		send_pos_counter = 0;
 		record_counter = 0;
+		mc_interface_release_motor();
 	} else if (custom_mode == CUSTOM_MODE_1) {
 		if (finish_flag == 0) {
 			if (record_counter < SEND_NUM) {
@@ -4335,7 +4338,7 @@ static THD_FUNCTION(hfi_thread, arg) {
 	}
 }
 
-static THD_FUNCTION(pid_thread, arg) {
+static THD_FUNCTION(pid_thread, arg) {  //在这个线程里反复执行PID
 	(void)arg;
 
 	chRegSetThreadName("foc pid");
@@ -4363,7 +4366,7 @@ static THD_FUNCTION(pid_thread, arg) {
 		float dt = timer_seconds_elapsed_since(last_time);
 		last_time = timer_time_now();
 
-		foc_run_pid_control_pos(encoder_index_found(), dt, (motor_all_state_t*)&m_motor_1);
+		foc_run_pid_control_pos(encoder_index_found(), dt, (motor_all_state_t*)&m_motor_1);  
 		foc_run_pid_control_speed(dt, (motor_all_state_t*)&m_motor_1);
 #ifdef HW_HAS_DUAL_MOTORS
 		foc_run_pid_control_pos(encoder_index_found(), dt, (motor_all_state_t*)&m_motor_2);

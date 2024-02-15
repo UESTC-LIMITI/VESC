@@ -175,6 +175,7 @@ typedef struct {             //电机的所有参数
 	float m_min_rpm_timer;
 	//HFI参数
 	bool m_cc_was_hfi;
+	//PID controller 相关
 	float m_pos_i_term;
 	float m_pos_prev_error;
 	float m_pos_dt_int;

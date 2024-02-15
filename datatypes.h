@@ -24,7 +24,7 @@
 #include <stdbool.h>
 #include "ch.h"
 
-//#define SHOOT_TEST
+#define SHOOT_TEST
 //#define USE_CUSTOM_ENCODER1
 
 

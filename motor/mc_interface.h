@@ -146,5 +146,11 @@ extern volatile float ADC_curr_norm_value[];
 #define HW_DEAD_TIME_NSEC				360.0	// Dead time
 #endif
 
+/**
+ * 自定义函数声明
+ */
+/**************************************************************************************************/
+float mc_interface_get_pos_multiturn(void);
+/**************************************************************************************************/
 
 #endif /* MC_INTERFACE_H_ */
