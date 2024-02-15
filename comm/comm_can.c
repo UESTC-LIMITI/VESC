@@ -1651,6 +1651,14 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 			mc_interface_set_pid_pos(buffer_get_float32(data8, 1e6, &ind));
 			timeout_reset();
 			break;
+			
+		case CAN_PACKET_SET_POS_MULTITURN:
+			ind = 0;
+			mc_interface_set_pid_pos_multiturn(buffer_get_float32(data8, 1e4, &ind));
+			//这里的scale如果还和控单圈位置一样的话，只能控 (2^31/1e6)=两千多度 的多圈，所以降低scale，现在能控 (2^31/1e4)= 200000+ 的正负度数
+			//大概是600圈 超出这个范围我也不知道会发生什么 =_= 
+			timeout_reset();
+			break;
 
 #if defined(SHOOT_TEST)  //CAN消息解码
 		case CAN_PACKET_SET_ACCEL_CURRENT:

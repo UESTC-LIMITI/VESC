@@ -444,6 +444,132 @@ void foc_run_pid_control_pos(bool index_found, float dt, motor_all_state_t *moto
 	}
 }
 
+/**
+ * PID控多圈位置， 从控制单圈位置(上面的那个)改的，以多圈误差作为error来源
+ * 老登之前似乎没有给P项限幅，由于多圈控制获取的初始误差较大，所以需要给P项限幅(也许不)
+ * 修改进度：
+ * 1. 获取多圈 done
+ * 2. 返回多圈 done
+ * 3. 根据多圈来计算error done
+ * 4. 写internface的接口 done
+ * 5. 写CAN解包信息，使得单片机能够控制电调使用这个模式 done
+ * 6. 在VESC库中新增这条命令的编码发送 done
+ * 7. 测试
+ * 
+ */
+
+void foc_run_pid_control_pos_multiturn(bool index_found, float dt, motor_all_state_t *motor) { 
+	mc_configuration *conf_now = motor->m_conf;
+
+	float angle_now = mc_interface_get_pos_multiturn();  //获取多圈
+	float angle_set = motor->m_pos_pid_set;
+
+	float p_term;
+	float d_term;
+	float d_term_proc;
+
+	if (motor->m_control_mode != CONTROL_MODE_POS_MULTITURN) {
+		if (motor->m_control_mode != CONTROL_MODE_POS) {  //这里一进来如果不是POS模式就重置POS的PID参数，然后直接返回
+			// PID is off. Return.
+			motor->m_pos_i_term = 0;
+			motor->m_pos_prev_error = 0;
+			motor->m_pos_prev_proc = angle_now;
+			motor->m_pos_d_filter = 0.0;
+			motor->m_pos_d_filter_proc = 0.0;
+			return;
+		} else {
+			return;  //不是多圈而是单圈，直接返回
+		}
+	}
+
+	// Compute parameters
+	float error = angle_set - angle_now;  
+	float error_sign = 1.0;
+
+	if (conf_now->m_sensor_port_mode != SENSOR_PORT_MODE_HALL) {
+		if (conf_now->foc_encoder_inverted) {
+			error_sign = -1.0;
+		}
+	}
+
+	error *= error_sign;  //真正的PID在这里
+
+	float kp = conf_now->p_pid_kp;
+	float ki = conf_now->p_pid_ki;
+	float kd = conf_now->p_pid_kd;
+	float kd_proc = conf_now->p_pid_kd_proc;
+
+	if (conf_now->p_pid_gain_dec_angle > 0.1) {
+		float min_error = conf_now->p_pid_gain_dec_angle / conf_now->p_pid_ang_div;
+		float error_abs = fabs(error);
+
+		if (error_abs < min_error) {
+			float scale = error_abs / min_error;
+			kp *= scale;
+			ki *= scale;
+			kd *= scale;
+			kd_proc *= scale;
+		}
+	}
+
+	p_term = error * kp;  
+	motor->m_pos_i_term += error * (ki * dt);
+
+	// Average DT for the D term when the error does not change. This likely
+	// happens at low speed when the position resolution is low and several
+	// control iterations run without position updates.
+	// TODO: Are there problems with this approach?
+	motor->m_pos_dt_int += dt;
+	if (error == motor->m_pos_prev_error) {
+		d_term = 0.0;
+	} else {
+		d_term = (error - motor->m_pos_prev_error) * (kd / motor->m_pos_dt_int);
+		motor->m_pos_dt_int = 0.0;
+	}
+
+	// Filter D
+	UTILS_LP_FAST(motor->m_pos_d_filter, d_term, conf_now->p_pid_kd_filter);
+	d_term = motor->m_pos_d_filter;
+
+	// Process D term
+	motor->m_pos_dt_int_proc += dt;
+	if (angle_now == motor->m_pos_prev_proc) {
+		d_term_proc = 0.0;
+	} else {
+		d_term_proc = -utils_angle_difference(angle_now, motor->m_pos_prev_proc) * error_sign * (kd_proc / motor->m_pos_dt_int_proc);
+		motor->m_pos_dt_int_proc = 0.0;
+	}
+
+	// Filter D process
+	UTILS_LP_FAST(motor->m_pos_d_filter_proc, d_term_proc, conf_now->p_pid_kd_filter);
+	d_term_proc = motor->m_pos_d_filter_proc;
+
+	// I-term wind-up protection
+	float p_tmp = p_term;
+	utils_truncate_number_abs(&p_tmp, 1.0);
+	utils_truncate_number_abs((float*)&motor->m_pos_i_term, 1.0 - fabsf(p_tmp));
+
+	// Store previous error
+	motor->m_pos_prev_error = error;
+	motor->m_pos_prev_proc = angle_now;
+
+	// Calculate output
+	float output = p_term + motor->m_pos_i_term + d_term + d_term_proc;
+	utils_truncate_number(&output, -1.0, 1.0);   //虽然Kp输出不限幅但是最后会限幅，但是Pterm太大也不行
+
+	if (conf_now->m_sensor_port_mode != SENSOR_PORT_MODE_HALL) {
+		if (index_found) {
+			motor->m_iq_set = output * conf_now->l_current_max * conf_now->l_current_max_scale;; //这个output一半应该是一个比较小的浮点数
+		} else {
+			// Rotate the motor with 40 % power until the encoder index is found.
+			motor->m_iq_set = 0.4 * conf_now->l_current_max * conf_now->l_current_max_scale;;
+		}
+	} else {
+		motor->m_iq_set = output * conf_now->l_current_max * conf_now->l_current_max_scale;;
+	}
+}
+
+
 void foc_run_pid_control_speed(float dt, motor_all_state_t *motor) {
 	mc_configuration *conf_now = motor->m_conf;
 	float p_term;

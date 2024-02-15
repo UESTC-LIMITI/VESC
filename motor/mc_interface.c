@@ -3033,3 +3033,61 @@ unsigned mc_interface_calc_crc(mc_configuration* conf_in, bool is_motor_2) {
 	conf->crc = crc_old;
 	return crc_new;
 }
+
+/**
+ * 自定义函数定义开始
+ */
+/**************************************************************************************************/
+/**
+ * @description: 读取多圈（编码器）
+ * @param {return} encoder_get_multiturn
+ * @return {*}
+ */
+float mc_interface_get_pos_multiturn(void) {
+	return encoder_get_multiturn();
+}
+
+/**
+ * 自定义控制多圈位置的接口函数，需要有编码器才能控多圈
+ * 
+ */
+void mc_interface_set_pid_pos_multiturn(float pos) {
+	SHUTDOWN_RESET();
+
+	if (mc_interface_try_input()) {
+		return;
+	}
+
+	volatile mc_configuration *conf = &motor_now()->m_conf;
+
+	motor_now()->m_position_set = pos;
+
+	pos += motor_now()->m_conf.p_pid_offset;
+	pos *= DIR_MULT;
+
+	if (encoder_is_configured()) {
+		if (conf->foc_encoder_inverted) {
+			pos *= -1.0;
+		}
+	}
+
+//	utils_norm_angle(&pos);  //就是这里导致了只能转单圈
+
+	switch (conf->motor_type) {
+	// case MOTOR_TYPE_BLDC:
+	// case MOTOR_TYPE_DC:
+	// 	mcpwm_set_pid_pos(pos);
+	// 	break;
+
+	case MOTOR_TYPE_FOC:  //目前只改了FOC的多圈控制2.15.2023 别的模式也不会用吧
+		mcpwm_foc_set_pid_pos_multiturn(pos);
+		break;
+
+	default:
+		break;
+	}
+
+	events_add("set_pid_pos_multiturn", pos);
+}
+
+/**************************************************************************************************/

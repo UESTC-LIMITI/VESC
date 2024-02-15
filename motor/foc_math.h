@@ -21,6 +21,7 @@
 #define FOC_MATH_H_
 
 #include "datatypes.h"
+#include "mc_interface.h"
 
 // Types
 typedef struct {

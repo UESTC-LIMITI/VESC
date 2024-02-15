@@ -188,18 +188,18 @@ void hw_setup_adc_channels(void) {
 	// ADC1 regular channels
 	ADC_RegularChannelConfig(ADC1, ADC_Channel_10, 1, t_samp);     //A_CURR
 	ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 2, t_samp);      //SH_A  
-#if !defined(USE_CUSTOM_ENCODER1)  //端口被复用
+//#if !defined(USE_CUSTOM_ENCODER1)  //端口被复用
 	ADC_RegularChannelConfig(ADC1, ADC_Channel_5, 3, t_samp);      //ADC_EXT1
-#endif
+//#endif
 	ADC_RegularChannelConfig(ADC1, ADC_Channel_14, 4, t_samp);     //MOTOR_TEMP
 	ADC_RegularChannelConfig(ADC1, ADC_Channel_Vrefint, 5, t_samp);//测量内部参考电压
 
 	// ADC2 regular channels
 	ADC_RegularChannelConfig(ADC2, ADC_Channel_11, 1, t_samp);     //B_CURR
 	ADC_RegularChannelConfig(ADC2, ADC_Channel_1, 2, t_samp);      //SH_B
-#if !defined(USE_CUSTOM_ENCODER1)   //端口被复用
+//#if !defined(USE_CUSTOM_ENCODER1)   //端口被复用
 	ADC_RegularChannelConfig(ADC2, ADC_Channel_6, 3, t_samp);      //ADC_EXT2
-#endif
+//#endif
 	ADC_RegularChannelConfig(ADC2, ADC_Channel_15, 4, t_samp);     //SHUTDOWN(ADC15)
 	ADC_RegularChannelConfig(ADC2, ADC_Channel_0, 5, t_samp);      //你跑去测A_CURR干什么？
 

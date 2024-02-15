@@ -802,6 +802,21 @@ void mcpwm_foc_set_pid_pos(float pos) {
 }
 
 /**
+ * 自定义多圈控制的状态更改函数，与上面的单圈控制对应
+ * 状态设置好以后PID线程里会执行多圈控制函数
+ */
+void mcpwm_foc_set_pid_pos_multiturn(float pos) {  
+	get_motor_now()->m_control_mode = CONTROL_MODE_POS_MULTITURN;
+	get_motor_now()->m_pos_pid_set = pos;  //设置多圈角度
+
+	if (get_motor_now()->m_state != MC_STATE_RUNNING) {
+		get_motor_now()->m_motor_released = false;
+		get_motor_now()->m_state = MC_STATE_RUNNING;
+	}
+}
+
+
+/**
  * Use current control and specify a goal current to use. The sign determines
  * the direction of the torque. Absolute values less than
  * conf->cc_min_current will release the motor.
