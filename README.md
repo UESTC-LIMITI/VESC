@@ -1,3 +1,5 @@
+# 2.18.2024 更新 记得拉取dev分支 master已废
+
 # VESC firmware
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
