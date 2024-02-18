@@ -2,8 +2,8 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-28 09:12:06
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2024-02-17 20:47:24
- * @FilePath: \MDK-ARM\RM3508\VESC_CAN.c
+ * @LastEditTime: 2024-02-18 20:46:40
+ * @FilePath: \VESC_Code\VESC对接的库\新的 适配新固件\VESC_CAN.c
  * @Description: 
  * VESC_CAN 1.0 曹总写的库 回传有问题，发送和设置模式分开 10.28.2021
  * VESC_CAN 2.0 GTY改写   可自定义回传，将命令函数分为单独的函数，与RM3508的库类似 1.29.2024
@@ -20,6 +20,29 @@
 #include "VESC_CAN.h"
 
 motor_info_t motor_info[8] = {0};  //VESC回传数据储存在这里
+volatile subarea_PID_parameter_t subarea_PID_parameter = {0};
+volatile subarea_PID_parameter_communication_t subarea_PID_parameter_communication = {false};
+
+bool VESC_ParamterInit(uint8_t id, CAN_HandleTypeDef *hcan) {
+	subarea_PID_parameter_t* para = &subarea_PID_parameter;
+	subarea_PID_parameter_communication_t* para_com_status = &subarea_PID_parameter_communication;
+	para_com_status->para1_received = false;
+	para_com_status->para2_received = false;
+	para_com_status->para3_received = false;
+	while (para_com_status->para1_received == false) {
+		VESC_GetSetSubareaPIDPara1Request(id, hcan);
+		HAL_Delay(50);
+	}
+	while (para_com_status->para2_received == false) {
+		VESC_GetSetSubareaPIDPara2Request(id, hcan);
+		HAL_Delay(50);
+	}
+	while (para_com_status->para3_received == false) {
+		VESC_GetSetSubareaPIDPara3Request(id, hcan);
+		HAL_Delay(50);
+	}
+	
+}
 
 /**
  * @description:                    CAN发送函数
@@ -28,14 +51,14 @@ motor_info_t motor_info[8] = {0};  //VESC回传数据储存在这里
  * @param {uint32_t} eid            上一级函数计算好的eid
  * @return {*}                      函数执行成功返回 1
  */
-bool VESC_CAN_SendData(CAN_HandleTypeDef *hcan, uint8_t id, uint32_t eid)
+bool VESC_CAN_SendData(CAN_HandleTypeDef *hcan, uint8_t id, uint32_t eid, uint32_t lenth)
 {
 	CAN_TxHeaderTypeDef TxMessage;
 	uint32_t TxMailboxX = CAN_TX_MAILBOX0; // CAN发送邮箱
 	uint32_t TimeOutCount = 0;
 
 	TxMessage.ExtId = eid;
-	TxMessage.DLC = 4;
+	TxMessage.DLC = lenth;
 	TxMessage.IDE = CAN_ID_EXT;
 	TxMessage.RTR = CAN_RTR_DATA;
 
@@ -58,7 +81,7 @@ bool VESC_CAN_SendData(CAN_HandleTypeDef *hcan, uint8_t id, uint32_t eid)
 	return true;
 }
 
-uint8_t VESC_Send_Buffer[4] = {0};  //发送的buffer
+uint8_t VESC_Send_Buffer[BUFFER_MAX_LENTH] = {0};  //发送的buffer
 
 /**
  * @description:                     实现各种功能的函数
@@ -77,7 +100,7 @@ bool VESC_SetRPM(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
 	for (int i = 3; i >= 0; i--)
 		VESC_Send_Buffer[i] = (temp >> ((3 - i) * 8)) & 0xff;
 	//send
-	VESC_CAN_SendData(hcan, id, eid);
+	VESC_CAN_SendData(hcan, id, eid, 4);
 	return true;
 }
 
@@ -91,7 +114,7 @@ bool VESC_SetDutyCycle(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
 	for (int i = 3; i >= 0; i--)
 		VESC_Send_Buffer[i] = (temp >> ((3 - i) * 8)) & 0xff;
 	//send
-	VESC_CAN_SendData(hcan, id, eid);
+	VESC_CAN_SendData(hcan, id, eid, 4);
 	return true;
 }
 
@@ -105,7 +128,7 @@ bool VESC_SetCurrent(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
 	for (int i = 3; i >= 0; i--)
 		VESC_Send_Buffer[i] = (temp >> ((3 - i) * 8)) & 0xff;
 	//send
-	VESC_CAN_SendData(hcan, id, eid);
+	VESC_CAN_SendData(hcan, id, eid, 4);
 	return true;
 }
 
@@ -119,7 +142,7 @@ bool VESC_SetCurrentBrake(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
 	for (int i = 3; i >= 0; i--)
 		VESC_Send_Buffer[i] = (temp >> ((3 - i) * 8)) & 0xff;
 	//send
-	VESC_CAN_SendData(hcan, id, eid);
+	VESC_CAN_SendData(hcan, id, eid, 4);
 	return true;
 }
 
@@ -132,7 +155,7 @@ bool VESC_SetPos(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
 	for (int i = 3; i >= 0; i--)
 		VESC_Send_Buffer[i] = (temp >> ((3 - i) * 8)) & 0xff;
 	//send
-	VESC_CAN_SendData(hcan, id, eid);
+	VESC_CAN_SendData(hcan, id, eid, 4);
 	return true;
 }
 
@@ -148,9 +171,153 @@ bool VESC_SetMultiturnPos(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
 	for (int i = 3; i >= 0; i--)
 		VESC_Send_Buffer[i] = (temp >> ((3 - i) * 8)) & 0xff;
 	//send
-	VESC_CAN_SendData(hcan, id, eid);
+	VESC_CAN_SendData(hcan, id, eid, 4);
 	return true;
 }
+
+/******************************************分区PID控制部分函数开始*******************************************/
+/**
+ * @description:                          设置分区PID控制参数 1组 2组 3组
+ * @param {subarea_PID_parameter_t} *para 储存参数的指针
+ * @param {uint8_t} id                    VESC id
+ * @param {CAN_HandleTypeDef} *hcan       目标CAN
+ * @return {*}
+ */
+bool VESC_SetSubareaPIDPara1(subarea_PID_parameter_t *para, uint8_t id, CAN_HandleTypeDef *hcan) {
+	if(id > 255 || id <= 0) {
+		VESC_Error_Handler(Set_id_Wrong);
+	}
+	int32_t ind = 0;
+	uint32_t eid = (id & 0xff) | ((uint32_t)CAN_PACKET_SET_SUBAREA_PARA1 << 8);
+	buffer_append_float16(VESC_Send_Buffer, para->kp1, SUBAREA_PARAMETER_KP_SCALE, &ind);
+	buffer_append_float16(VESC_Send_Buffer, para->ki1, SUBAREA_PARAMETER_KP_SCALE, &ind);
+	buffer_append_float16(VESC_Send_Buffer, para->kd1, SUBAREA_PARAMETER_KP_SCALE, &ind);
+	buffer_append_float16(VESC_Send_Buffer, para->kd_proc1, SUBAREA_PARAMETER_KP_SCALE, &ind);
+	VESC_CAN_SendData(hcan, id, eid, 8);
+	return true;
+}
+
+bool VESC_SetSubareaPIDPara2(subarea_PID_parameter_t *para, uint8_t id, CAN_HandleTypeDef *hcan) {
+	if(id > 255 || id <= 0) {
+		VESC_Error_Handler(Set_id_Wrong);
+	}
+	int32_t ind = 0;
+	uint32_t eid = (id & 0xff) | ((uint32_t)CAN_PACKET_SET_SUBAREA_PARA2 << 8);
+	buffer_append_float16(VESC_Send_Buffer, para->kp2, SUBAREA_PARAMETER_KP_SCALE, &ind);
+	buffer_append_float16(VESC_Send_Buffer, para->ki2, SUBAREA_PARAMETER_KP_SCALE, &ind);
+	buffer_append_float16(VESC_Send_Buffer, para->kd2, SUBAREA_PARAMETER_KP_SCALE, &ind);
+	buffer_append_float16(VESC_Send_Buffer, para->kd_proc2, SUBAREA_PARAMETER_KP_SCALE, &ind);
+	VESC_CAN_SendData(hcan, id, eid, 8);
+	return true;
+}
+
+bool VESC_SetSubareaPIDPara3(subarea_PID_parameter_t *para, uint8_t id, CAN_HandleTypeDef *hcan) {
+	if(id > 255 || id <= 0) {
+		VESC_Error_Handler(Set_id_Wrong);
+	}
+	int32_t ind = 0;
+	uint32_t eid = (id & 0xff) | ((uint32_t)CAN_PACKET_SET_SUBAREA_PARA3 << 8);
+	buffer_append_float16(VESC_Send_Buffer, para->subarea_1, SUBAREA_PARAMETER_DEADBAND_SCALE, &ind);
+	buffer_append_float16(VESC_Send_Buffer, para->subarea_2, SUBAREA_PARAMETER_DEADBAND_SCALE, &ind);
+	buffer_append_float16(VESC_Send_Buffer, para->deadband, SUBAREA_PARAMETER_DEADBAND_SCALE, &ind);
+	VESC_CAN_SendData(hcan, id, eid, 6);
+	return true;
+}
+
+/**
+ * @description:                    获取分区PID控制参数 1组 2组 3组 发送请求
+ * @param {uint8_t} id              VESC id
+ * @param {CAN_HandleTypeDef} *hcan 目标CAN
+ * @return {*}               
+ */
+bool VESC_GetSetSubareaPIDPara1Request(uint8_t id, CAN_HandleTypeDef *hcan) {
+	if(id > 255 || id <= 0) {
+		VESC_Error_Handler(Set_id_Wrong);
+	}
+	int32_t ind = 0;
+	uint32_t eid = (id & 0xff) | ((uint32_t)CAN_PACKET_GET_SUBAREA_PARA1 << 8);
+	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
+	VESC_CAN_SendData(hcan, id, eid, 4);
+	return true;
+}
+
+bool VESC_GetSetSubareaPIDPara2Request(uint8_t id, CAN_HandleTypeDef *hcan) {
+	if(id > 255 || id <= 0) {
+		VESC_Error_Handler(Set_id_Wrong);
+	}
+	int32_t ind = 0;
+	uint32_t eid = (id & 0xff) | ((uint32_t)CAN_PACKET_GET_SUBAREA_PARA2 << 8);
+	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
+	VESC_CAN_SendData(hcan, id, eid, 4);
+	return true;
+}
+
+bool VESC_GetSetSubareaPIDPara3Request(uint8_t id, CAN_HandleTypeDef *hcan) {
+	if(id > 255 || id <= 0) {
+		VESC_Error_Handler(Set_id_Wrong);
+	}
+	int32_t ind = 0;
+	uint32_t eid = (id & 0xff) | ((uint32_t)CAN_PACKET_GET_SUBAREA_PARA3 << 8);
+	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
+	VESC_CAN_SendData(hcan, id, eid, 4);
+	return true;
+}
+
+
+/**
+ * @description:                          获取分区PID控制参数 1组 2组 3组 的解算函数
+ * @param {subarea_PID_parameter_t} *para 储存参数的指针
+ * @param {uint8_t*} buffer               接收buffer
+ * @return {*}
+ */
+bool VESC_GetSetSubareaPIDPara1(subarea_PID_parameter_t *para, uint8_t* buffer) {
+	int32_t ind = 0;
+	para->kp1 = buffer_get_float16(buffer, SUBAREA_PARAMETER_KP_SCALE, &ind);
+	para->ki1 = buffer_get_float16(buffer, SUBAREA_PARAMETER_KP_SCALE, &ind);
+	para->kd1 = buffer_get_float16(buffer, SUBAREA_PARAMETER_KP_SCALE, &ind);
+	para->kd_proc1 = buffer_get_float16(buffer, SUBAREA_PARAMETER_KP_SCALE, &ind);
+	return true;
+}
+
+bool VESC_GetSetSubareaPIDPara2(subarea_PID_parameter_t *para, uint8_t* buffer) {
+	int32_t ind = 0;
+	para->kp2 = buffer_get_float16(buffer, SUBAREA_PARAMETER_KP_SCALE, &ind);
+	para->ki2 = buffer_get_float16(buffer, SUBAREA_PARAMETER_KP_SCALE, &ind);
+	para->kd2 = buffer_get_float16(buffer, SUBAREA_PARAMETER_KP_SCALE, &ind);
+	para->kd_proc2 = buffer_get_float16(buffer, SUBAREA_PARAMETER_KP_SCALE, &ind);
+	return true;
+}
+
+bool VESC_GetSetSubareaPIDPara3(subarea_PID_parameter_t *para, uint8_t* buffer) {
+	int32_t ind = 0;
+	para->subarea_1 = buffer_get_float16(buffer, SUBAREA_PARAMETER_DEADBAND_SCALE, &ind);
+	para->subarea_2 = buffer_get_float16(buffer, SUBAREA_PARAMETER_DEADBAND_SCALE, &ind);
+	para->deadband = buffer_get_float16(buffer, SUBAREA_PARAMETER_DEADBAND_SCALE, &ind);
+	return true;
+}
+
+/**
+ * @description:                    使能区PID控制
+ * @param {uint8_t} id              VESC id
+ * @param {CAN_HandleTypeDef} *hcan 目标CAN
+ * @param {uint32_t} flag           置0失能， 大于0使能
+ * @return {*}
+ */
+bool VESC_EnableSubareaPIDControl(uint8_t id, CAN_HandleTypeDef *hcan, uint32_t flag) {
+	if(id > 255 || id <= 0) {
+		VESC_Error_Handler(Set_id_Wrong);
+	}
+	int32_t ind = 0;
+	uint32_t eid = (id & 0xff) | ((uint32_t)CAN_PACKET_SET_SUBAREA_PARA3 << 8);
+	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
+	buffer_append_uint32(VESC_Send_Buffer, flag, &ind);
+	VESC_CAN_SendData(hcan, id, eid, 4);
+	return true;
+}
+
+/******************************************分区PID控制部分函数结束*******************************************/
+
+
 /*************************************************************************************/
 
 /**
@@ -162,7 +329,7 @@ bool VESC_SetMultiturnPos(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
  * @param {CAN_HandleTypeDef} *hcan 目标CAN
  * @return {*}                      成功返回处
  */
-bool VESC_SendCommand(CAN_PACKET_ID Cmd, float value, int32_t scale, uint8_t id, CAN_HandleTypeDef *hcan) {
+bool VESC_SendCommand(CAN_PACKET_ID Cmd, float value, int32_t scale, uint8_t id, CAN_HandleTypeDef *hcan, uint32_t lenth) {
 	if(id > 255 || id <= 0) {
 		VESC_Error_Handler(Set_id_Wrong);
 	}
@@ -171,7 +338,7 @@ bool VESC_SendCommand(CAN_PACKET_ID Cmd, float value, int32_t scale, uint8_t id,
 	for (int i = 3; i >= 0; i--)
 		VESC_Send_Buffer[i] = (temp >> ((3 - i) * 8)) & 0xff;
 	//send
-	VESC_CAN_SendData(hcan, id, eid);
+	VESC_CAN_SendData(hcan, id, eid, lenth);
 	return true;	
 }
 
@@ -183,14 +350,14 @@ bool VESC_SendCommand(CAN_PACKET_ID Cmd, float value, int32_t scale, uint8_t id,
  * @return {*}               返回需要的类型
  */
 /*************************************************************************************/
-float uchar2float(uint8_t* buffer, uint32_t *index) {
+float uchar2float(uint8_t* buffer, int32_t *index) {
 	float temp = 0;
 	memcpy(&(temp), (buffer+(*index)), 4);
 	(*index) += 4;
 	return temp;
 }
 
-int32_t uchar2int32(uint8_t* buffer, uint32_t *index) {
+int32_t uchar2int32(uint8_t* buffer, int32_t *index) {
 	int32_t temp = 0;
 	temp |= ((0xff & buffer[(*index)++]) << 24);
 	temp |= ((0xff & buffer[(*index)++]) << 16);
@@ -209,12 +376,8 @@ int32_t uchar2int32(uint8_t* buffer, uint32_t *index) {
 bool VESC_CAN_decode(uint32_t ExtID, uint8_t *pData) {
 	uint32_t packet_id = ExtID >> 8;
 	uint8_t id = ExtID & 0x00000FF;
-	uint32_t index = 0;
-	if (packet_id != (uint32_t)CAN_PACKET_STATUS &&
-		packet_id != (uint32_t)CAN_PACKET_STATUS_2 &&
-		packet_id != (uint32_t)CAN_PACKET_STATUS_3 &&
-		packet_id != (uint32_t)CAN_PACKET_STATUS_4 )
-		return false;
+	int32_t index = 0;
+	bool ret = false;
 
 #if defined(FLOAT_TRANSMITTED)
 	switch (packet_id) {
@@ -241,7 +404,7 @@ bool VESC_CAN_decode(uint32_t ExtID, uint8_t *pData) {
 		default:
 			return false;
 	}
-	#else
+#else
 	switch (packet_id) {
 		case (uint32_t)CAN_PACKET_STATUS:
 			motor_info[id-1].rpm = (uchar2int32(pData, &index) / RPM_SCALE);
@@ -261,6 +424,18 @@ bool VESC_CAN_decode(uint32_t ExtID, uint8_t *pData) {
 
 		case (uint32_t)CAN_PACKET_STATUS_4:
 			//目前 do nothing			
+			break;
+
+		case (uint32_t)CAN_PACKET_GET_SUBAREA_PARA1:
+			VESC_GetSetSubareaPIDPara1(&subarea_PID_parameter, pData);
+			break;
+
+		case (uint32_t)CAN_PACKET_GET_SUBAREA_PARA2:
+			VESC_GetSetSubareaPIDPara2(&subarea_PID_parameter, pData);
+			break;
+
+		case (uint32_t)CAN_PACKET_GET_SUBAREA_PARA3:
+			VESC_GetSetSubareaPIDPara3(&subarea_PID_parameter, pData);
 			break;
 
 		default:

@@ -1540,24 +1540,24 @@ static void send_can_status(uint8_t msgs, uint8_t id) { //CAN状态发送函数�
 bool subarea_PID_parameter_send(uint8_t index) {  
 	uint8_t send_buffer[8] = {0};
 	uint8_t id = app_get_configuration()->controller_id;
-	CAN_PACKET_ID packet = CAN_PACKET_GET_SUBAREA_PARA1;
+	CAN_PACKET_ID packet_id = CAN_PACKET_GET_SUBAREA_PARA1;
 	switch (index)
 	{
-	case 1:
-		packet = CAN_PACKET_GET_SUBAREA_PARA1;
-		break;
-	case 2:
-		packet = CAN_PACKET_GET_SUBAREA_PARA2;
-		break;
-	case 3:
-		packet = CAN_PACKET_GET_SUBAREA_PARA3;
-		break;
-	default:
-	    return false;
-		break;
+		case 1:
+			packet_id = CAN_PACKET_GET_SUBAREA_PARA1;
+			break;
+		case 2:
+			packet_id = CAN_PACKET_GET_SUBAREA_PARA2;
+			break;
+		case 3:
+			packet_id = CAN_PACKET_GET_SUBAREA_PARA3;
+			break;
+		default:
+			return false;
+			break;
 	}
 	if(mc_interface_get_subarea_PID_parameter(index, send_buffer)) {
-		comm_can_transmit_eid_replace(id | ((uint32_t)packet << 8), send_buffer, 8, true, 0);
+		comm_can_transmit_eid_replace(id | ((uint32_t)packet_id << 8), send_buffer, 8, true, 0);
 	} else {
 		return false;
 	}
@@ -1735,7 +1735,6 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 			uint32_t flag = buffer_get_uint32(data8, &ind);
 			mc_interface_subarea_PID_control_enable(flag);
 			break;
-
 
         //以下都是shoot部分
 		case CAN_PACKET_SET_ACCEL_CURRENT:

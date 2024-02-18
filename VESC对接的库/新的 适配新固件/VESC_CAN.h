@@ -2,8 +2,8 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-28 09:12:06
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2024-02-17 19:17:38
- * @FilePath: \MDK-ARM\Motor\VESC_CAN.h
+ * @LastEditTime: 2024-02-18 20:10:02
+ * @FilePath: \VESC_Code\VESC对接的库\新的 适配新固件\VESC_CAN.h
  * @Description: 
  * VESC_CAN 1.0 曹总写的库 回传有问题，发送和设置模式分开 10.28.2021
  * VESC_CAN 2.0 GTY改写   可自定义回传，将命令函数分为单独的函数，与RM3508的库类似 1.29.2024
@@ -27,6 +27,7 @@
 #include "main.h"
 #include "stdbool.h"
 #include "string.h"
+#include "buffer.h"
 
 #define CLAMP(x, lower, upper) (x >= upper ? upper : (x <= lower ? lower : x))
 
@@ -34,6 +35,7 @@
 #define MAX_CURRENT 70  //只是限幅电流命令，可改
 #define MAX_MULTITURN 2147483 //计算得出当前多圈的scale能够覆盖这么多角度范围
 //#define FLOAT_TRANSMITTED
+#define BUFFER_MAX_LENTH 8
 
 #define DUTY_CYCLE_SCALE                    1e5
 #define CURRENT_SCALE                       1e3
@@ -69,6 +71,7 @@ typedef enum {                              //VESC里定义的CAN数据包类型
 	CAN_PACKET_SET_SUBAREA_PARA2			= 81,
 	CAN_PACKET_SET_SUBAREA_PARA3			= 82,
 	CAN_PACKET_STORE_MC_CONFIGURATION		= 83,
+	CAN_PACKET_ENABLE_SUBAREA_PID	        = 84,
 } CAN_PACKET_ID;
 
 typedef struct {                             // VESC回传信息           
@@ -81,8 +84,7 @@ typedef struct {                             // VESC回传信息
 	float power;                            // 总功率 = V*I
 } motor_info_t;
 
-typedef struct 
-{
+typedef struct {
 	float subarea_1;
 	float subarea_2;
 	float kp1;
@@ -96,6 +98,12 @@ typedef struct
 	float deadband;
 }subarea_PID_parameter_t;
 
+typedef struct {
+	bool para1_received;
+	bool para2_received;
+	bool para3_received;
+}subarea_PID_parameter_communication_t;
+
 
 typedef enum {
 	CAN_SendData_TimeOut,
@@ -105,12 +113,14 @@ typedef enum {
 
 extern motor_info_t motor_info[8];
 extern uint8_t VESC_Send_Buffer[4];
+extern volatile subarea_PID_parameter_t subarea_PID_parameter;
+extern volatile subarea_PID_parameter_communication_t subarea_PID_parameter_communication;
 
-float uchar2float(uint8_t* buffer, uint32_t *index);
-int32_t uchar2int32(uint8_t* buffer, uint32_t *index);
+float uchar2float(uint8_t* buffer, int32_t *index);
+int32_t uchar2int32(uint8_t* buffer, int32_t *index);
 
 bool VESC_CAN_decode(uint32_t ExtID, uint8_t *pData);
-bool VESC_CAN_SendData(CAN_HandleTypeDef *hcan, uint8_t id, uint32_t eid);
+bool VESC_CAN_SendData(CAN_HandleTypeDef *hcan, uint8_t id, uint32_t eid, uint32_t lenth);
 
 bool VESC_SetRPM(float value, uint8_t id, CAN_HandleTypeDef *hcan);
 bool VESC_SetDutyCycle(float value, uint8_t id, CAN_HandleTypeDef *hcan);
@@ -118,7 +128,21 @@ bool VESC_SetCurrent(float value, uint8_t id, CAN_HandleTypeDef *hcan);
 bool VESC_SetCurrentBrake(float value, uint8_t id, CAN_HandleTypeDef *hcan);
 bool VESC_SetPos(float value, uint8_t id, CAN_HandleTypeDef *hcan);
 bool VESC_SetMultiturnPos(float value, uint8_t id, CAN_HandleTypeDef *hcan);
-bool VESC_SendCommand(CAN_PACKET_ID Cmd, float value, int32_t scale, uint8_t id, CAN_HandleTypeDef *hcan);
+bool VESC_SendCommand(CAN_PACKET_ID Cmd, float value, int32_t scale, uint8_t id, CAN_HandleTypeDef *hcan, uint32_t lenth);
+
+/******************************************分区PID控制部分函数开始*******************************************/
+bool VESC_SetSubareaPIDPara1(subarea_PID_parameter_t *para, uint8_t id, CAN_HandleTypeDef *hcan);
+bool VESC_SetSubareaPIDPara2(subarea_PID_parameter_t *para, uint8_t id, CAN_HandleTypeDef *hcan);
+bool VESC_SetSubareaPIDPara3(subarea_PID_parameter_t *para, uint8_t id, CAN_HandleTypeDef *hcan);
+bool VESC_GetSetSubareaPIDPara1Request(uint8_t id, CAN_HandleTypeDef *hcan);
+bool VESC_GetSetSubareaPIDPara2Request(uint8_t id, CAN_HandleTypeDef *hcan);
+bool VESC_GetSetSubareaPIDPara3Request(uint8_t id, CAN_HandleTypeDef *hcan);
+bool VESC_GetSetSubareaPIDPara1(subarea_PID_parameter_t *para, uint8_t* buffer);
+bool VESC_GetSetSubareaPIDPara2(subarea_PID_parameter_t *para, uint8_t* buffer);
+bool VESC_GetSetSubareaPIDPara3(subarea_PID_parameter_t *para, uint8_t* buffer);
+bool VESC_EnableSubareaPIDControl(uint8_t id, CAN_HandleTypeDef *hcan, uint32_t flag);
+/******************************************分区PID控制部分函数结束*******************************************/
+
 
 static void VESC_Error_Handler(VESC_ErrorCode_t Code);
 
