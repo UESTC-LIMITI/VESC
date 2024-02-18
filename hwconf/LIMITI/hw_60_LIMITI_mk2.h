@@ -2,7 +2,7 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-15 20:08:13
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2024-02-04 11:36:44
+ * @LastEditTime: 2024-02-17 20:30:21
  * @FilePath: \VESC_Code\hwconf\LIMITI\hw_60_LIMITI_mk2.h
  * @Description: 
  * 
@@ -33,6 +33,7 @@
 #define HW_IS_LIMITI_MK2
 #define DISABLE_HW_LIMITS
 #define USE_CUSTOM_ENCODER1
+#define SHOOT_TEST
 
 #include "hw_60_LIMITI_core.h"
 

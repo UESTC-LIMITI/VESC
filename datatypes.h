@@ -24,12 +24,12 @@
 #include <stdbool.h>
 #include "ch.h"
 
-//#define SHOOT_TEST
+#define SHOOT_TEST
 //#define USE_CUSTOM_ENCODER1
 
 
-#if defined(SHOOT_TEST) //SHOOT_TEST的CUSTOM_MODE定义
 #define SEND_NUM 20
+
 typedef enum {
 	CUSTOM_MODE_NONE = 0,
 	CUSTOM_MODE_1,
@@ -40,7 +40,25 @@ typedef enum {
 	CUSTOM_MODE_6,
 	CUSTOM_MODE_7,
 } CUSTOM_MODE;
-#endif
+
+typedef struct  {
+	float subarea_1;
+	float subarea_2;
+	float kp1;
+	float ki1;
+	float kd1;
+	float kd_proc1;
+	float kp2;
+	float ki2;
+	float kd2;
+	float kd_proc2;
+	float deadband;
+	bool enable_subarea_control;
+	bool initialized;
+} subarea_PID_t;  //分区PID结构体
+
+#define SUBAREA1    1.5
+#define SUBAREA2    0.2
 
 // Data types
 typedef enum {
@@ -581,6 +599,9 @@ typedef struct {
 
 	// Protect from flash corruption.
 	uint16_t crc;
+
+	subarea_PID_t subarea_PID;  //这里新增 可能在读数据的时候出错
+
 } mc_configuration;
 
 // Applications to use
@@ -1192,8 +1213,20 @@ typedef enum {
 	CAN_PACKET_SET_RESET_SPEED				= 71,
 	CAN_PACKET_SET_RESET_POS_SAMPLE_POINTS	= 72,
 	CAN_PACKET_SET_TARGET_DUTY				= 73,
+	CAN_PACKET_SET_HOME			            = 75,
+	CAN_PACKET_HOMING			            = 76,
 #endif
 	CAN_PACKET_SET_POS_MULTITURN			= 74,
+
+	CAN_PACKET_GET_SUBAREA_PARA1			= 77,  //2.18.2024新增 分区PID参数读取和设置
+	CAN_PACKET_GET_SUBAREA_PARA2			= 78,
+	CAN_PACKET_GET_SUBAREA_PARA3			= 79,
+	CAN_PACKET_SET_SUBAREA_PARA1			= 80,
+	CAN_PACKET_SET_SUBAREA_PARA2			= 81,
+	CAN_PACKET_SET_SUBAREA_PARA3			= 82,
+	CAN_PACKET_STORE_MC_CONFIGURATION		= 83,
+	CAN_PACKET_ENABLE_SUBAREA_PID	        = 84,
+	CAN_PACKET_DISABLE_SUBAREA_PID	        = 85,
 	CAN_PACKET_MAKE_ENUM_32_BITS = 0xFFFFFFFF,
 } CAN_PACKET_ID;
 

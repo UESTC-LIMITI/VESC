@@ -51,6 +51,7 @@
 volatile uint16_t ADC_Value[HW_ADC_CHANNELS + HW_ADC_CHANNELS_EXTRA];
 volatile float ADC_curr_norm_value[6];
 
+
 typedef struct {
 	mc_configuration m_conf;
 	mc_fault_code m_fault_now;
@@ -94,7 +95,7 @@ typedef struct {
 } motor_if_state_t;
 
 // Private variables
-static volatile motor_if_state_t m_motor_1;
+static volatile motor_if_state_t m_motor_1;  //定义 motor1 所有状态？
 #ifdef HW_HAS_DUAL_MOTORS
 static volatile motor_if_state_t m_motor_2;
 #endif
@@ -162,7 +163,7 @@ void mc_interface_init(void) {   //上位机与下位机交互的init？
 	memset((void*)&m_motor_2, 0, sizeof(motor_if_state_t));
 #endif
 
-	conf_general_read_mc_configuration((mc_configuration*)&m_motor_1.m_conf, false);
+	conf_general_read_mc_configuration((mc_configuration*)&m_motor_1.m_conf, false); //上电初始化，从eeprom里读电机设置
 #ifdef HW_HAS_DUAL_MOTORS
 	conf_general_read_mc_configuration((mc_configuration*)&m_motor_2.m_conf, true);
 #endif
@@ -1497,7 +1498,7 @@ float mc_interface_get_pid_pos_now(void) {
 /**
  * Update the offset such that the current angle becomes angle_now
  */
-void mc_interface_update_pid_pos_offset(float angle_now, bool store) {
+void mc_interface_update_pid_pos_offset(float angle_now, bool store) {  //更新POS PID偏置角度，但是如果选择store的话会读取所有电机设置并储存在eeprom里
 	mc_configuration *mcconf = mempools_alloc_mcconf();
 	*mcconf = *mc_interface_get_configuration();
 
@@ -3043,7 +3044,7 @@ unsigned mc_interface_calc_crc(mc_configuration* conf_in, bool is_motor_2) {
  * @param {return} encoder_get_multiturn
  * @return {*}
  */
-float mc_interface_get_pos_multiturn(void) {
+float mc_interface_get_pos_multiturn (void) {
 	return encoder_get_multiturn();
 }
 
@@ -3051,7 +3052,7 @@ float mc_interface_get_pos_multiturn(void) {
  * 自定义控制多圈位置的接口函数，需要有编码器才能控多圈
  * 
  */
-void mc_interface_set_pid_pos_multiturn(float pos) {
+void mc_interface_set_pid_pos_multiturn (float pos) {
 	SHUTDOWN_RESET();
 
 	if (mc_interface_try_input()) {
@@ -3070,15 +3071,11 @@ void mc_interface_set_pid_pos_multiturn(float pos) {
 			pos *= -1.0;
 		}
 	}
-
-//	utils_norm_angle(&pos);  //就是这里导致了只能转单圈
-
 	switch (conf->motor_type) {
 	// case MOTOR_TYPE_BLDC:
 	// case MOTOR_TYPE_DC:
 	// 	mcpwm_set_pid_pos(pos);
 	// 	break;
-
 	case MOTOR_TYPE_FOC:  //目前只改了FOC的多圈控制2.15.2023 别的模式也不会用吧
 		mcpwm_foc_set_pid_pos_multiturn(pos);
 		break;
@@ -3088,6 +3085,102 @@ void mc_interface_set_pid_pos_multiturn(float pos) {
 	}
 
 	events_add("set_pid_pos_multiturn", pos);
+}
+
+/**
+ * @description: 
+ * @param {uint8_t} index    要第几组参数
+ * @param {uint8_t*} buffer  待发送数组
+ * @return {*}               成功返回处 失败返回佛斯
+ */
+bool mc_interface_get_subarea_PID_parameter (uint8_t index, uint8_t* buffer) {
+	int32_t ind = 0;
+	volatile mc_configuration* conf = &(m_motor_1.m_conf);
+	if(index != 1 || index != 2 || index != 3) {
+		return false;
+	}
+	switch (index) {
+		case 1:
+			buffer_append_float16(buffer, conf->subarea_PID.kp1, 1e6, &ind);
+			buffer_append_float16(buffer, conf->subarea_PID.ki1, 1e6, &ind);
+			buffer_append_float16(buffer, conf->subarea_PID.kd1, 1e6, &ind);
+			buffer_append_float16(buffer, conf->subarea_PID.kd_proc1, 1e6, &ind);
+			break;
+		case 2:
+			buffer_append_float16(buffer, conf->subarea_PID.kp2, 1e6, &ind);
+			buffer_append_float16(buffer, conf->subarea_PID.ki2, 1e6, &ind);
+			buffer_append_float16(buffer, conf->subarea_PID.kd2, 1e6, &ind);
+			buffer_append_float16(buffer, conf->subarea_PID.kd_proc2, 1e6, &ind);			
+			break;
+		case 3:
+			buffer_append_float16(buffer, conf->subarea_PID.subarea_1, 1e4, &ind);
+			buffer_append_float16(buffer, conf->subarea_PID.subarea_2, 1e4, &ind);
+			buffer_append_float16(buffer, conf->subarea_PID.deadband, 1e4, &ind);   //不知道scale保证的精度够不够，先用着吧2.18.2024
+			break;
+		default:
+			return false;
+			break;
+	}
+	return true;
+}
+
+/**
+ * @description:           三个分区PID参数的读取函数
+ * @param {uint8_t} buffer 接收buffer
+ * @return {*}             成功返回处
+ */
+bool mc_interface_set_subarea_PID_parameter1 (uint8_t* buffer) {
+	int32_t ind = 0;
+	volatile subarea_PID_t* para = &(m_motor_1.m_conf.subarea_PID);
+	para->kp1 = buffer_get_float16(buffer, 1e6, &ind);
+	para->ki1 = buffer_get_float16(buffer, 1e6, &ind);
+	para->kd1 = buffer_get_float16(buffer, 1e6, &ind);
+	para->kd_proc1 = buffer_get_float16(buffer, 1e6, &ind);
+	return true;
+}
+
+bool mc_interface_set_subarea_PID_parameter2 (uint8_t* buffer) {
+	int32_t ind = 0;
+	volatile subarea_PID_t* para = &(m_motor_1.m_conf.subarea_PID);
+	para->kp2 = buffer_get_float16(buffer, 1e6, &ind);
+	para->ki2 = buffer_get_float16(buffer, 1e6, &ind);
+	para->kd2 = buffer_get_float16(buffer, 1e6, &ind);
+	para->kd_proc2 = buffer_get_float16(buffer, 1e6, &ind);
+	return true;
+}
+
+bool mc_interface_set_subarea_PID_parameter3 (uint8_t* buffer) {
+	int32_t ind = 0;
+	volatile subarea_PID_t* para = &(m_motor_1.m_conf.subarea_PID);
+	para->subarea_1 = buffer_get_float16(buffer, 1e4, &ind);
+	para->subarea_2 = buffer_get_float16(buffer, 1e4, &ind);
+	para->deadband = buffer_get_float16(buffer, 1e4, &ind);
+	return true;
+}
+
+/**
+ * @description:            储存电机设置到eeprom中，下次直接读取
+ * @param {bool} is_motor_2 只是双电机会用到
+ * @return {*}              成功返回处，失败返回佛斯
+ */
+bool mc_interface_store_mc_configuration (bool is_motor_2) {
+	mc_configuration* conf = &(m_motor_1.m_conf);
+	return conf_general_store_mc_configuration(conf, is_motor_2);
+}
+
+/**
+ * @description:          使能分区PID控制
+ * @param {uint32_t} flag CAN上收到的消息，是控制使能或失能的flag
+ * @return {*}            成功返回处
+ */
+bool mc_interface_subarea_PID_control_enable (uint32_t flag) {
+	volatile subarea_PID_t* para = &(m_motor_1.m_conf.subarea_PID);
+	if (flag > 0) {
+		para->enable_subarea_control = true;
+	} else {
+		para->enable_subarea_control = false;
+	}
+	return true;
 }
 
 /**************************************************************************************************/

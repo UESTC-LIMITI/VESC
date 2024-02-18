@@ -45,7 +45,11 @@
 #include "lispif.h"
 #endif
 
-#if defined(SHOOT_TEST)  //SHOOT_TEST相关变量
+//#define SHOOT_TEST
+
+//以下是shoot
+
+float home_angle = 20;
 float accel_current = 60.0f;
 float limit_speed = 20000.0f;
 float target_speed = 20000.0f;
@@ -59,7 +63,7 @@ int send_speed_counter = 0;
 int send_pos_counter = 0;
 float target_duty = 0.3f;
 //int test_flag = 0;
-
+extern float home_angle;
 extern float brake_pos;
 extern float brake_speed;
 extern uint8_t finish_flag;
@@ -73,9 +77,16 @@ extern uint16_t record_counter;
 
 extern float dI;
 //extern int test_flag;
+//以上是shoot
 
-#endif
+bool homing_flag = 0;
+int homing_count = 0;
 
+extern bool homing_flag;
+extern int homing_count;
+
+uint8_t send_subarea_PID_parameter_index = 0;
+extern uint8_t send_subarea_PID_parameter_index;
 
 // Settings
 #define RX_FRAMES_SIZE	50
@@ -341,7 +352,7 @@ void comm_can_transmit_eid_if(uint32_t id, const uint8_t *data, uint8_t len, int
 	comm_can_transmit_eid_replace(id, data, len, false, interface);
 }
 
-void comm_can_transmit_sid(uint32_t id, const uint8_t *data, uint8_t len) {
+void comm_can_transmit_sid(uint32_t id, const uint8_t *data, uint8_t len) {  //CAN标准帧发送
 	if (len > 8) {
 		len = 8;
 	}
@@ -388,7 +399,7 @@ void comm_can_transmit_sid(uint32_t id, const uint8_t *data, uint8_t len) {
  * @param p_func
  * Pointer to the function.
  */
-void comm_can_set_sid_rx_callback(bool (*p_func)(uint32_t id, uint8_t *data, uint8_t len)) {
+void comm_can_set_sid_rx_callback(bool (*p_func)(uint32_t id, uint8_t *data, uint8_t len)) {  //可以设置CAN的接收标准帧和拓展帧回调函数
 	sid_callback = p_func;
 }
 
@@ -1225,7 +1236,7 @@ void comm_can_send_status2(uint8_t id, bool replace) {
 	custom_append_float(buffer, (float)encoder_get_multiturn(), &send_index);
 #else
 	buffer_append_int32(buffer, (int32_t)(mc_interface_get_pid_pos_now() * 1e6), &send_index);
-	buffer_append_int32(buffer, (int32_t)(encoder_get_multiturn() * 1e6), &send_index);
+	buffer_append_int32(buffer, (int32_t)(encoder_get_multiturn() * 1e3), &send_index);
 #endif
 	comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_STATUS_2 << 8),
 			buffer, send_index, replace, 0);
@@ -1248,7 +1259,6 @@ void comm_can_send_status3(uint8_t id, bool replace) {
 void comm_can_send_status4(uint8_t id, bool replace) {
 	int32_t send_index = 0;
 	uint8_t buffer[8];
-#if defined(SHOOT_TEST)
 	if (send_speed_counter <= record_counter && send_speed_counter < SEND_NUM && finish_flag == 1) {
 		for (int i = 0; i < 4; i++) {
 			if(send_speed_counter < record_counter) {
@@ -1259,12 +1269,6 @@ void comm_can_send_status4(uint8_t id, bool replace) {
 			}
 		}
 	}
-#else
-	buffer_append_int16(buffer, (int16_t)(mc_interface_temp_fet_filtered() * 1e1), &send_index);
-	buffer_append_int16(buffer, (int16_t)(mc_interface_temp_motor_filtered() * 1e1), &send_index);
-	buffer_append_int16(buffer, (int16_t)(mc_interface_get_tot_current_in_filtered() * 1e1), &send_index);
-	buffer_append_int16(buffer, (int16_t)(mc_interface_get_pid_pos_now() * 50.0), &send_index);
-#endif
 	comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_STATUS_4 << 8),
 			buffer, send_index, replace, 0);
 	
@@ -1273,7 +1277,6 @@ void comm_can_send_status4(uint8_t id, bool replace) {
 void comm_can_send_status5(uint8_t id, bool replace) {
 	int32_t send_index = 0;
 	uint8_t buffer[8];
-#if defined(SHOOT_TEST)
 	if (send_pos_counter <= record_counter && send_pos_counter < SEND_NUM && finish_flag == 1) {
 		for (int i = 0; i < 4; i++) {
 			if(send_pos_counter < record_counter) {
@@ -1286,13 +1289,6 @@ void comm_can_send_status5(uint8_t id, bool replace) {
 		comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_STATUS_5 << 8),
 			buffer, send_index, replace, 0);
 	}
-#else
-	buffer_append_int32(buffer, mc_interface_get_tachometer_value(false), &send_index);
-	buffer_append_int16(buffer, (int16_t)(mc_interface_get_input_voltage_filtered() * 1e1), &send_index);
-	buffer_append_int16(buffer, 0, &send_index); // Reserved for now
-	comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_STATUS_5 << 8),
-			buffer, send_index, replace, 0);
-#endif
 }
 
 void comm_can_send_status6(uint8_t id, bool replace) {
@@ -1480,7 +1476,7 @@ static THD_FUNCTION(cancom_status_internal_thread, arg) {
 }
 #endif
 
-static void send_can_status(uint8_t msgs, uint8_t id) {
+static void send_can_status(uint8_t msgs, uint8_t id) { //CAN状态发送函数，判断有哪些状态需要发送，然后发送
 	if ((msgs >> 0) & 1) {
 		mc_interface_select_motor_thread(1);
 		comm_can_send_status1(id, false);
@@ -1536,7 +1532,39 @@ static void send_can_status(uint8_t msgs, uint8_t id) {
 	}
 }
 
-static THD_FUNCTION(cancom_status_thread, arg) {
+/**
+ * @description:          模仿上面的状态发送函数写的, 根据index发送分区PID参数
+ * @param {uint8_t} index 要发第几套参数
+ * @return {*}            成功返回处，失败返回佛斯
+ */
+bool subarea_PID_parameter_send(uint8_t index) {  
+	uint8_t send_buffer[8] = {0};
+	uint8_t id = app_get_configuration()->controller_id;
+	CAN_PACKET_ID packet = CAN_PACKET_GET_SUBAREA_PARA1;
+	switch (index)
+	{
+	case 1:
+		packet = CAN_PACKET_GET_SUBAREA_PARA1;
+		break;
+	case 2:
+		packet = CAN_PACKET_GET_SUBAREA_PARA2;
+		break;
+	case 3:
+		packet = CAN_PACKET_GET_SUBAREA_PARA3;
+		break;
+	default:
+	    return false;
+		break;
+	}
+	if(mc_interface_get_subarea_PID_parameter(index, send_buffer)) {
+		comm_can_transmit_eid_replace(id | ((uint32_t)packet << 8), send_buffer, 8, true, 0);
+	} else {
+		return false;
+	}
+	return true;
+}
+
+static THD_FUNCTION(cancom_status_thread, arg) {  //通过can 状态信息发送的线程函数
 	(void)arg;
 	chRegSetThreadName("CAN status 1");
 
@@ -1544,9 +1572,15 @@ static THD_FUNCTION(cancom_status_thread, arg) {
 		const app_configuration *conf = app_get_configuration();
 
 		if (conf->can_mode == CAN_MODE_VESC) {
-			send_can_status(conf->can_status_msgs_r1, conf->controller_id);
+			send_can_status(conf->can_status_msgs_r1, conf->controller_id);  //发送函数，判断有哪些状态需要发送，然后发送
 		}
-
+		if (send_subarea_PID_parameter_index == 1 ||
+		    send_subarea_PID_parameter_index == 2 ||
+			send_subarea_PID_parameter_index == 3    ) {
+				subarea_PID_parameter_send(send_subarea_PID_parameter_index);
+				send_subarea_PID_parameter_index = 0;
+			}
+		
 		while (conf->can_status_rate_1 == 0) {
 			chThdSleepMilliseconds(10);
 			conf = app_get_configuration();
@@ -1651,16 +1685,59 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 			mc_interface_set_pid_pos(buffer_get_float32(data8, 1e6, &ind));
 			timeout_reset();
 			break;
-			
+
+/****************************************** custom 部分开始~~ ********************************************/
 		case CAN_PACKET_SET_POS_MULTITURN:
 			ind = 0;
-			mc_interface_set_pid_pos_multiturn(buffer_get_float32(data8, 1e4, &ind));
-			//这里的scale如果还和控单圈位置一样的话，只能控 (2^31/1e6)=两千多度 的多圈，所以降低scale，现在能控 (2^31/1e4)= 200000+ 的正负度数
-			//大概是600圈 超出这个范围我也不知道会发生什么 =_= 
+			mc_interface_set_pid_pos_multiturn(buffer_get_float32(data8, 1e3, &ind));
+			//这里的scale如果还和控单圈位置一样的话，只能控 (2^31/1e6)=两千多度 的多圈，所以降低scale，现在能控 (2^31/1e3)= 2000000+ 的正负度数
+			//大概是6000圈 超出这个范围我也不知道会发生什么 =_= 
 			timeout_reset();
 			break;
 
-#if defined(SHOOT_TEST)  //CAN消息解码
+		case CAN_PACKET_GET_SUBAREA_PARA1:   //分区PID参数读取和发送部分
+			send_subarea_PID_parameter_index = 1;
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_GET_SUBAREA_PARA2:
+			send_subarea_PID_parameter_index = 2;
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_GET_SUBAREA_PARA3:
+			send_subarea_PID_parameter_index = 3;
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_SET_SUBAREA_PARA1:
+			mc_interface_set_subarea_PID_parameter1(data8);
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_SET_SUBAREA_PARA2:
+			mc_interface_set_subarea_PID_parameter2(data8);
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_SET_SUBAREA_PARA3:
+			mc_interface_set_subarea_PID_parameter3(data8);
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_STORE_MC_CONFIGURATION:
+			mc_interface_store_mc_configuration(false);
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_ENABLE_SUBAREA_PID:
+			ind = 0;
+			uint32_t flag = buffer_get_uint32(data8, &ind);
+			mc_interface_subarea_PID_control_enable(flag);
+			break;
+
+
+        //以下都是shoot部分
 		case CAN_PACKET_SET_ACCEL_CURRENT:
 			ind = 0;
 			accel_current =(buffer_get_float32(data8, 1e3, &ind));
@@ -1707,35 +1784,28 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 				record_counter = 0;
 				switch (temp) {
 				case 1:
-				case 2:
 					state_now++;
-//					mc_interface_set_current(accel_current);
-					break;
-				case 3:
-					state_now++;
-//					mc_interface_set_pid_speed(-reset_speed);
-					break;
-				case 4:
-					state_now++;
-//					mc_interface_set_current(accel_current);
-					break;
-				case 5:
-					state_now++;
-//					mc_interface_set_pid_speed(1000);
-					break;
-				case 6:
-					state_now++;
-//					mc_interface_set_pid_speed(1000);
-					break;
-				case 7:
-					state_now++;
-//					mc_interface_set_pid_speed(1000);
+					mc_interface_set_current(accel_current);
 					break;
 				default:
+					mc_interface_release_motor();
 					break;
 				}
 			}
 			custom_mode = ((CUSTOM_MODE)temp);
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_SET_HOME:
+			ind = 0;
+			home_angle = mc_interface_get_pos_multiturn();
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_HOMING:
+			homing_flag = 1;
+			mc_interface_set_pid_pos_multiturn(home_angle);
+			ind = 0;
 			timeout_reset();
 			break;
 
@@ -1761,8 +1831,8 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 			target_duty = (buffer_get_float32(data8, 1e5, &ind));
 			timeout_reset();
 			break;
+/****************************************** custom 部分结束~~ ********************************************/
 
-#endif
 
 		case CAN_PACKET_FILL_RX_BUFFER: {
 			int buf_ind = 0;

@@ -2,8 +2,8 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-28 09:12:06
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2024-02-17 20:47:24
- * @FilePath: \MDK-ARM\RM3508\VESC_CAN.c
+ * @LastEditTime: 2024-02-16 16:07:16
+ * @FilePath: \MDK-ARM\VESC\VESC_CAN.c
  * @Description: 
  * VESC_CAN 1.0 曹总写的库 回传有问题，发送和设置模式分开 10.28.2021
  * VESC_CAN 2.0 GTY改写   可自定义回传，将命令函数分为单独的函数，与RM3508的库类似 1.29.2024
@@ -15,47 +15,22 @@
  * Status3：总电流 总电压 计算得到总功率
  * 更多Status 可定制
  * Todo：写一个编码器多圈重置功能
+ * 2.16 新增多圈位置控制和FDCAN的库
  * Copyright (c) 2024 by UESTC_LIMITI, All Rights Reserved. 
  */
-#include "VESC_CAN.h"
+#include "VESC_CAN.h"	
 
 motor_info_t motor_info[8] = {0};  //VESC回传数据储存在这里
 
 /**
- * @description:                    CAN发送函数
- * @param {CAN_HandleTypeDef} *hcan 目标CAN
- * @param {uint8_t} id              目标id
+ * @description:                    FDCAN发送函数
+ * @param {FDCAN_HandleTypeDef} *hfdcan 目标FDCAN
+ * @param {uint8_t} id              目标
  * @param {uint32_t} eid            上一级函数计算好的eid
- * @return {*}                      函数执行成功返回 1
+ * @return {*}                      函数执行成功返回 1 不成功返回0
  */
-bool VESC_CAN_SendData(CAN_HandleTypeDef *hcan, uint8_t id, uint32_t eid)
-{
-	CAN_TxHeaderTypeDef TxMessage;
-	uint32_t TxMailboxX = CAN_TX_MAILBOX0; // CAN发送邮箱
-	uint32_t TimeOutCount = 0;
-
-	TxMessage.ExtId = eid;
-	TxMessage.DLC = 4;
-	TxMessage.IDE = CAN_ID_EXT;
-	TxMessage.RTR = CAN_RTR_DATA;
-
-	while (!HAL_CAN_GetTxMailboxesFreeLevel(hcan)) { // 等待空邮箱	
-		if ((hcan->Instance->TSR & CAN_TSR_TME0) != RESET) // 检查发送邮箱状态
-			TxMailboxX = CAN_TX_MAILBOX0;
-		else if ((hcan->Instance->TSR & CAN_TSR_TME1) != RESET)
-			TxMailboxX = CAN_TX_MAILBOX1;
-		else if ((hcan->Instance->TSR & CAN_TSR_TME2) != RESET)
-			TxMailboxX = CAN_TX_MAILBOX2;
-		else {
-			TimeOutCount++;
-			if (TimeOutCount > 1000) {
-				VESC_Error_Handler(CAN_SendData_TimeOut);
-			}
-		}
-	}
-
-	HAL_CAN_AddTxMessage(hcan, &TxMessage, VESC_Send_Buffer, (uint32_t *)TxMailboxX);
-	return true;
+bool VESC_FDCAN_SendData(FDCAN_HandleTypeDef *hfdcan, uint8_t id, uint32_t eid) {
+	 return FDCAN_SendData_Ext(hfdcan, VESC_Send_Buffer, eid, 4);
 }
 
 uint8_t VESC_Send_Buffer[4] = {0};  //发送的buffer
@@ -64,11 +39,11 @@ uint8_t VESC_Send_Buffer[4] = {0};  //发送的buffer
  * @description:                     实现各种功能的函数
  * @param {float} value              目标值
  * @param {uint8_t} id               目标id
- * @param {CAN_HandleTypeDef} *hcan  目标CAN
+ * @param {FDCAN_HandleTypeDef} *hfdcan  目标CAN
  * @return {*}                       成功执行函数返回 1
  */
 /*************************************************************************************/
-bool VESC_SetRPM(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
+bool VESC_SetRPM(float value, uint8_t id, FDCAN_HandleTypeDef *hfdcan) {
 	if(id > 255 || id <= 0) {
 		VESC_Error_Handler(Set_id_Wrong);
 	}
@@ -77,11 +52,11 @@ bool VESC_SetRPM(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
 	for (int i = 3; i >= 0; i--)
 		VESC_Send_Buffer[i] = (temp >> ((3 - i) * 8)) & 0xff;
 	//send
-	VESC_CAN_SendData(hcan, id, eid);
+	VESC_FDCAN_SendData(hfdcan, id, eid);
 	return true;
 }
 
-bool VESC_SetDutyCycle(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
+bool VESC_SetDutyCycle(float value, uint8_t id, FDCAN_HandleTypeDef *hfdcan) {
 	if(id > 255 || id <= 0) {
 		VESC_Error_Handler(Set_id_Wrong);
 	}
@@ -91,11 +66,11 @@ bool VESC_SetDutyCycle(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
 	for (int i = 3; i >= 0; i--)
 		VESC_Send_Buffer[i] = (temp >> ((3 - i) * 8)) & 0xff;
 	//send
-	VESC_CAN_SendData(hcan, id, eid);
+	VESC_FDCAN_SendData(hfdcan, id, eid);
 	return true;
 }
 
-bool VESC_SetCurrent(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
+bool VESC_SetCurrent(float value, uint8_t id, FDCAN_HandleTypeDef *hfdcan) {
 	if(id > 255 || id <= 0) {
 		VESC_Error_Handler(Set_id_Wrong);
 	}
@@ -105,11 +80,11 @@ bool VESC_SetCurrent(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
 	for (int i = 3; i >= 0; i--)
 		VESC_Send_Buffer[i] = (temp >> ((3 - i) * 8)) & 0xff;
 	//send
-	VESC_CAN_SendData(hcan, id, eid);
+	VESC_FDCAN_SendData(hfdcan, id, eid);
 	return true;
 }
 
-bool VESC_SetCurrentBrake(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
+bool VESC_SetCurrentBrake(float value, uint8_t id, FDCAN_HandleTypeDef *hfdcan) {
 	if(id > 255 || id <= 0) {
 		VESC_Error_Handler(Set_id_Wrong);
 	}
@@ -119,11 +94,11 @@ bool VESC_SetCurrentBrake(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
 	for (int i = 3; i >= 0; i--)
 		VESC_Send_Buffer[i] = (temp >> ((3 - i) * 8)) & 0xff;
 	//send
-	VESC_CAN_SendData(hcan, id, eid);
+	VESC_FDCAN_SendData(hfdcan, id, eid);
 	return true;
 }
 
-bool VESC_SetPos(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
+bool VESC_SetPos(float value, uint8_t id, FDCAN_HandleTypeDef *hfdcan) {
 	if(id > 255 || id <= 0) {
 		VESC_Error_Handler(Set_id_Wrong);
 	}
@@ -132,11 +107,11 @@ bool VESC_SetPos(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
 	for (int i = 3; i >= 0; i--)
 		VESC_Send_Buffer[i] = (temp >> ((3 - i) * 8)) & 0xff;
 	//send
-	VESC_CAN_SendData(hcan, id, eid);
+	VESC_FDCAN_SendData(hfdcan, id, eid);
 	return true;
 }
 
-bool VESC_SetMultiturnPos(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
+bool VESC_SetMultiturnPos(float value, uint8_t id, FDCAN_HandleTypeDef *hfdcan) {
 	if(id > 255 || id <= 0) {
 		VESC_Error_Handler(Set_id_Wrong);
 	}
@@ -148,32 +123,10 @@ bool VESC_SetMultiturnPos(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
 	for (int i = 3; i >= 0; i--)
 		VESC_Send_Buffer[i] = (temp >> ((3 - i) * 8)) & 0xff;
 	//send
-	VESC_CAN_SendData(hcan, id, eid);
+	VESC_FDCAN_SendData(hfdcan, id, eid);
 	return true;
 }
 /*************************************************************************************/
-
-/**
- * @description:                    发送通用指令的函数
- * @param {CAN_PACKET_ID} Cmd       指令
- * @param {float} value             值
- * @param {int32_t} scale           涉及发送数值需要用到的幅值
- * @param {uint8_t} id              VESC id
- * @param {CAN_HandleTypeDef} *hcan 目标CAN
- * @return {*}                      成功返回处
- */
-bool VESC_SendCommand(CAN_PACKET_ID Cmd, float value, int32_t scale, uint8_t id, CAN_HandleTypeDef *hcan) {
-	if(id > 255 || id <= 0) {
-		VESC_Error_Handler(Set_id_Wrong);
-	}
-	uint32_t eid = (id & 0xff) | ((uint32_t)Cmd << 8);
- 	int temp = (int)value*scale;
-	for (int i = 3; i >= 0; i--)
-		VESC_Send_Buffer[i] = (temp >> ((3 - i) * 8)) & 0xff;
-	//send
-	VESC_CAN_SendData(hcan, id, eid);
-	return true;	
-}
 
 
 /**
@@ -201,12 +154,12 @@ int32_t uchar2int32(uint8_t* buffer, uint32_t *index) {
 /*************************************************************************************/
 
 /**
- * @description:            CAN消息解码  
+ * @description:            FDCAN消息解码  
  * @param {uint32_t} ExtID  收到的eid
  * @param {uint8_t} pData   接收buffer
  * @return {*}              成功返回 1 不成功返回 0
  */
-bool VESC_CAN_decode(uint32_t ExtID, uint8_t *pData) {
+bool VESC_FDCAN_decode(uint32_t ExtID, uint8_t *pData) {
 	uint32_t packet_id = ExtID >> 8;
 	uint8_t id = ExtID & 0x00000FF;
 	uint32_t index = 0;

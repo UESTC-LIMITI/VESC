@@ -2,8 +2,8 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-28 09:12:06
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2024-02-17 19:17:38
- * @FilePath: \MDK-ARM\Motor\VESC_CAN.h
+ * @LastEditTime: 2024-02-16 16:09:30
+ * @FilePath: \MDK-ARM\VESC\VESC_CAN.h
  * @Description: 
  * VESC_CAN 1.0 曹总写的库 回传有问题，发送和设置模式分开 10.28.2021
  * VESC_CAN 2.0 GTY改写   可自定义回传，将命令函数分为单独的函数，与RM3508的库类似 1.29.2024
@@ -15,15 +15,16 @@
  * Status3：  总电流 总电压 计算得到总功率
  * 更多Status 可定制
  * Todo：     写一个编码器多圈重置功能
+ * 2.16 新增多圈位置控制和FDCAN的库
  * Copyright (c) 2024 by UESTC_LIMITI, All Rights Reserved. 
  */
 
 #ifndef __VESC_CAN_H__
 #define __VESC_CAN_H__
 
-#include "can.h"
+#include "fdcan.h"
+#include "fdcan_bsp.h"
 #include "stdint.h"
-#include "can_bsp.h"
 #include "main.h"
 #include "stdbool.h"
 #include "string.h"
@@ -41,8 +42,6 @@
 #define RPM_SCALE                           1e0   
 #define POS_SCALE                           1e6
 #define MULTITURN_POS_SCALE                 1e3
-#define SUBAREA_PARAMETER_KP_SCALE          1e6 
-#define SUBAREA_PARAMETER_DEADBAND_SCALE    1e4 
 
 typedef enum {                              //VESC里定义的CAN数据包类型
 	CAN_PACKET_SET_DUTY						= 0,
@@ -51,27 +50,14 @@ typedef enum {                              //VESC里定义的CAN数据包类型
 	CAN_PACKET_SET_RPM						= 3,
 	CAN_PACKET_SET_POS						= 4,
 	CAN_PACKET_SET_POS_MULTITURN			= 74,  //2.15.2024新增
-	CAN_PACKET_SET_ACCEL_CURRENT			= 63,  
-	CAN_PACKET_SET_TARGET_SPEED			    = 65,  
-	CAN_PACKET_SET_BRAKE_CURRENT			= 68,
-	CAN_PACKET_SET_CUSTOM_MODE				= 69,
-	CAN_PACKET_SET_HOME			            = 75,
-	CAN_PACKET_HOMING			            = 76,
 	CAN_PACKET_STATUS                       = 9,
 	CAN_PACKET_STATUS_2						= 14,
 	CAN_PACKET_STATUS_3						= 15,
 	CAN_PACKET_STATUS_4						= 16,
 	CAN_PACKET_SHUTDOWN						= 31,
-	CAN_PACKET_GET_SUBAREA_PARA1			= 77,  //2.18.2024新增 分区PID参数读取和设置
-	CAN_PACKET_GET_SUBAREA_PARA2			= 78,
-	CAN_PACKET_GET_SUBAREA_PARA3			= 79,
-	CAN_PACKET_SET_SUBAREA_PARA1			= 80,
-	CAN_PACKET_SET_SUBAREA_PARA2			= 81,
-	CAN_PACKET_SET_SUBAREA_PARA3			= 82,
-	CAN_PACKET_STORE_MC_CONFIGURATION		= 83,
 } CAN_PACKET_ID;
 
-typedef struct {                             // VESC回传信息           
+typedef struct{                             // VESC回传信息           
 	float rpm;	   	  	                    // 转速
 	float duty_cycle;                       // 占空比
 	float pos;         	                    // 位置
@@ -80,22 +66,6 @@ typedef struct {                             // VESC回传信息
 	float tot_voltage;                      // 总电压
 	float power;                            // 总功率 = V*I
 } motor_info_t;
-
-typedef struct 
-{
-	float subarea_1;
-	float subarea_2;
-	float kp1;
-	float ki1;
-	float kd1;
-	float kd_proc1;
-	float kp2;
-	float ki2;
-	float kd2;
-	float kd_proc2;
-	float deadband;
-}subarea_PID_parameter_t;
-
 
 typedef enum {
 	CAN_SendData_TimeOut,
@@ -109,16 +79,15 @@ extern uint8_t VESC_Send_Buffer[4];
 float uchar2float(uint8_t* buffer, uint32_t *index);
 int32_t uchar2int32(uint8_t* buffer, uint32_t *index);
 
-bool VESC_CAN_decode(uint32_t ExtID, uint8_t *pData);
-bool VESC_CAN_SendData(CAN_HandleTypeDef *hcan, uint8_t id, uint32_t eid);
+bool VESC_FDCAN_decode    (uint32_t ExtID, uint8_t *pData);
+bool VESC_FDCAN_SendData  (FDCAN_HandleTypeDef *hfdcan, uint8_t id, uint32_t eid);
 
-bool VESC_SetRPM(float value, uint8_t id, CAN_HandleTypeDef *hcan);
-bool VESC_SetDutyCycle(float value, uint8_t id, CAN_HandleTypeDef *hcan);
-bool VESC_SetCurrent(float value, uint8_t id, CAN_HandleTypeDef *hcan);
-bool VESC_SetCurrentBrake(float value, uint8_t id, CAN_HandleTypeDef *hcan);
-bool VESC_SetPos(float value, uint8_t id, CAN_HandleTypeDef *hcan);
-bool VESC_SetMultiturnPos(float value, uint8_t id, CAN_HandleTypeDef *hcan);
-bool VESC_SendCommand(CAN_PACKET_ID Cmd, float value, int32_t scale, uint8_t id, CAN_HandleTypeDef *hcan);
+bool VESC_SetRPM          (float value, uint8_t id, FDCAN_HandleTypeDef *hfdcan);
+bool VESC_SetDutyCycle    (float value, uint8_t id, FDCAN_HandleTypeDef *hfdcan);
+bool VESC_SetCurrent      (float value, uint8_t id, FDCAN_HandleTypeDef *hfdcan);
+bool VESC_SetCurrentBrake (float value, uint8_t id, FDCAN_HandleTypeDef *hfdcan);
+bool VESC_SetPos          (float value, uint8_t id, FDCAN_HandleTypeDef *hfdcan);
+bool VESC_SetMultiturnPos (float value, uint8_t id, FDCAN_HandleTypeDef *hfdcan);
 
 static void VESC_Error_Handler(VESC_ErrorCode_t Code);
 

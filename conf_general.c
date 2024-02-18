@@ -296,7 +296,7 @@ static bool store_eeprom_var(eeprom_var *v, int address, uint16_t base) {
  * @param conf
  * A pointer to a app_configuration struct to write the read configuration to.
  */
-void conf_general_read_app_configuration(app_configuration *conf) {
+void conf_general_read_app_configuration(app_configuration *conf) {  //从eeprom里读app_configuration？
 	bool is_ok = true;
 	uint8_t *conf_addr = (uint8_t*)conf;
 	uint16_t var;
@@ -407,7 +407,7 @@ bool conf_general_store_app_configuration(app_configuration *conf) {
  * @param conf
  * A pointer to a mc_configuration struct to write the read configuration to.
  */
-void conf_general_read_mc_configuration(mc_configuration *conf, bool is_motor_2) {
+void conf_general_read_mc_configuration(mc_configuration *conf, bool is_motor_2) {  //上电初始化从eeprom中读电机设置，存在conf中
 	bool is_ok = true;
 	uint8_t *conf_addr = (uint8_t*)conf;
 	uint16_t var;
@@ -416,7 +416,7 @@ void conf_general_read_mc_configuration(mc_configuration *conf, bool is_motor_2)
 	for (unsigned int i = 0;i < (sizeof(mc_configuration) / 2);i++) {
 		if (EE_ReadVariable(base + i, &var) == 0) {
 			conf_addr[2 * i] = (var >> 8) & 0xFF;
-			conf_addr[2 * i + 1] = var & 0xFF;
+			conf_addr[2 * i + 1] = var & 0xFF;    //一次读两个字节，一个个字节存在conf中就构成了mc_configuration
 		} else {
 			is_ok = false;
 			break;
@@ -446,7 +446,7 @@ void conf_general_read_mc_configuration(mc_configuration *conf, bool is_motor_2)
  * @param conf
  * A pointer to the configuration that should be stored.
  */
-bool conf_general_store_mc_configuration(mc_configuration *conf, bool is_motor_2) {
+bool conf_general_store_mc_configuration(mc_configuration *conf, bool is_motor_2) {  //调用这个函数可以把电机设置存在eeprom里，app设置同理
 	int motor_old = mc_interface_get_motor_thread();
 
 	mc_interface_select_motor_thread(1);

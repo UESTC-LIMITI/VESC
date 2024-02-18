@@ -21,6 +21,13 @@
 #include "utils_math.h"
 #include <math.h>
 
+extern bool homing_flag;
+extern int homing_count;
+
+
+#define POS_PID_DEADBAND 1.5
+#define POS_PID_DEADBAND_GAIN 3
+
 // See http://cas.ensmp.fr/~praly/Telechargement/Journaux/2010-IEEE_TPEL-Lee-Hong-Nam-Ortega-Praly-Astolfi.pdf
 void foc_observer_update(float v_alpha, float v_beta, float i_alpha, float i_beta,
 		float dt, observer_state *state, float *phase, motor_all_state_t *motor) {
@@ -339,6 +346,7 @@ void foc_svm(float alpha, float beta, uint32_t PWMFullDutyCycle,
 
 void foc_run_pid_control_pos(bool index_found, float dt, motor_all_state_t *motor) {
 	mc_configuration *conf_now = motor->m_conf;
+	volatile subarea_PID_t *subarea_PID = &(conf_now->subarea_PID);
 
 	float angle_now = motor->m_pos_pid_now;
 	float angle_set = motor->m_pos_pid_set;
@@ -347,14 +355,17 @@ void foc_run_pid_control_pos(bool index_found, float dt, motor_all_state_t *moto
 	float d_term;
 	float d_term_proc;
 
-	// PID is off. Return.
 	if (motor->m_control_mode != CONTROL_MODE_POS) {
-		motor->m_pos_i_term = 0;
-		motor->m_pos_prev_error = 0;
-		motor->m_pos_prev_proc = angle_now;
-		motor->m_pos_d_filter = 0.0;
-		motor->m_pos_d_filter_proc = 0.0;
-		return;
+		if (motor->m_control_mode != CONTROL_MODE_POS_MULTITURN) {  //这里一进来如果不是POS模式就重置POS的PID参数，然后直接返回
+			// PID is off. Return.
+			motor->m_pos_i_term = 0;
+			motor->m_pos_prev_error = 0;
+			motor->m_pos_prev_proc = angle_now;
+			motor->m_pos_d_filter = 0.0;
+			motor->m_pos_d_filter_proc = 0.0;
+			return;
+		}
+		return;  //不是多圈而是单圈，直接返回
 	}
 
 	// Compute parameters
@@ -368,15 +379,31 @@ void foc_run_pid_control_pos(bool index_found, float dt, motor_all_state_t *moto
 	}
 
 	error *= error_sign;
+	float error_abs = fabs(error);
 
 	float kp = conf_now->p_pid_kp;
 	float ki = conf_now->p_pid_ki;
 	float kd = conf_now->p_pid_kd;
 	float kd_proc = conf_now->p_pid_kd_proc;
 
+	if (subarea_PID->enable_subarea_control) {
+		if (error_abs < subarea_PID->deadband) {
+			error = 0;
+		} else if (error_abs < subarea_PID->subarea_2) {  //二重死区内控制再加强
+			kp = subarea_PID->kp2;
+			ki = subarea_PID->ki2;
+			kd = subarea_PID->kd2;
+			kd_proc = subarea_PID->kd_proc2;
+		} else if (error_abs < subarea_PID->subarea_1) {  //死区内控制加强
+			kp = subarea_PID->kp1;
+			ki = subarea_PID->ki1;
+			kd = subarea_PID->kd1;
+			kd_proc = subarea_PID->kd_proc1;
+		}
+	}
+
 	if (conf_now->p_pid_gain_dec_angle > 0.1) {
 		float min_error = conf_now->p_pid_gain_dec_angle / conf_now->p_pid_ang_div;
-		float error_abs = fabs(error);
 
 		if (error_abs < min_error) {
 			float scale = error_abs / min_error;
@@ -386,6 +413,7 @@ void foc_run_pid_control_pos(bool index_found, float dt, motor_all_state_t *moto
 			kd_proc *= scale;
 		}
 	}
+	
 
 	p_term = error * kp;
 	motor->m_pos_i_term += error * (ki * dt);
@@ -456,10 +484,12 @@ void foc_run_pid_control_pos(bool index_found, float dt, motor_all_state_t *moto
  * 6. 在VESC库中新增这条命令的编码发送 done
  * 7. 测试
  * 
+ * 2.18.2024 新增分区PID控制
  */
 
 void foc_run_pid_control_pos_multiturn(bool index_found, float dt, motor_all_state_t *motor) { 
 	mc_configuration *conf_now = motor->m_conf;
+	volatile subarea_PID_t *subarea_PID = &(conf_now->subarea_PID);
 
 	float angle_now = mc_interface_get_pos_multiturn();  //获取多圈
 	float angle_set = motor->m_pos_pid_set;
@@ -477,9 +507,8 @@ void foc_run_pid_control_pos_multiturn(bool index_found, float dt, motor_all_sta
 			motor->m_pos_d_filter = 0.0;
 			motor->m_pos_d_filter_proc = 0.0;
 			return;
-		} else {
-			return;  //不是多圈而是单圈，直接返回
 		}
+		return;  //不是多圈而是单圈，直接返回
 	}
 
 	// Compute parameters
@@ -499,9 +528,26 @@ void foc_run_pid_control_pos_multiturn(bool index_found, float dt, motor_all_sta
 	float kd = conf_now->p_pid_kd;
 	float kd_proc = conf_now->p_pid_kd_proc;
 
+	float error_abs = fabs(error);
+
+	if (subarea_PID->enable_subarea_control) {
+		if (error_abs < subarea_PID->deadband) {
+			error = 0;
+		} else if (error_abs < subarea_PID->subarea_2) {  //二重死区内控制再加强
+			kp = subarea_PID->kp2;
+			ki = subarea_PID->ki2;
+			kd = subarea_PID->kd2;
+			kd_proc = subarea_PID->kd_proc2;
+		} else if (error_abs < subarea_PID->subarea_1) {  //死区内控制加强
+			kp = subarea_PID->kp1;
+			ki = subarea_PID->ki1;
+			kd = subarea_PID->kd1;
+			kd_proc = subarea_PID->kd_proc1;
+		}
+	}
+
 	if (conf_now->p_pid_gain_dec_angle > 0.1) {
 		float min_error = conf_now->p_pid_gain_dec_angle / conf_now->p_pid_ang_div;
-		float error_abs = fabs(error);
 
 		if (error_abs < min_error) {
 			float scale = error_abs / min_error;
@@ -555,7 +601,24 @@ void foc_run_pid_control_pos_multiturn(bool index_found, float dt, motor_all_sta
 
 	// Calculate output
 	float output = p_term + motor->m_pos_i_term + d_term + d_term_proc;
-	utils_truncate_number(&output, -1.0, 1.0);   //虽然Kp输出不限幅但是最后会限幅，但是Pterm太大也不行
+    //以下这些是shoot关于自动归位的内容
+	if (homing_flag) {
+		if (error_abs > 20) {
+			utils_truncate_number(&output, -0.06, 0.06);
+		} else {
+			utils_truncate_number(&output, -error_abs/20, error_abs/20);
+		}
+		if (error_abs < 1) {
+			homing_count ++;
+			if (homing_count > 10000) {
+				homing_count = 0;
+				homing_flag = 0;
+			}
+		} else {
+			homing_count = 0;
+		}
+	}
+	utils_truncate_number(&output, -0.6, 0.6);   //虽然Kp输出不限幅但是最后会限幅
 
 	if (conf_now->m_sensor_port_mode != SENSOR_PORT_MODE_HALL) {
 		if (index_found) {
@@ -569,6 +632,18 @@ void foc_run_pid_control_pos_multiturn(bool index_found, float dt, motor_all_sta
 	}
 }
 
+// /**
+//  * 分段PID控制的函数
+//  * 
+//  */
+// static bool subarea_PID_parameter_load(float error_abs, mc_configuration *conf_now) {
+// 	if (!conf_now->subarea_PID.enable_subarea_control) {
+// 		return false;
+// 	}
+// 	if (error_abs < conf_now->subarea_PID.subarea_2) {
+		 
+// 	}
+// }
 
 void foc_run_pid_control_speed(float dt, motor_all_state_t *motor) {
 	mc_configuration *conf_now = motor->m_conf;
