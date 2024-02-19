@@ -1574,12 +1574,16 @@ static THD_FUNCTION(cancom_status_thread, arg) {  //通过can 状态信息发送
 		if (conf->can_mode == CAN_MODE_VESC) {
 			send_can_status(conf->can_status_msgs_r1, conf->controller_id);  //发送函数，判断有哪些状态需要发送，然后发送
 		}
+		chThdSleepMilliseconds(1);
+
 		if (send_subarea_PID_parameter_index == 1 ||
 		    send_subarea_PID_parameter_index == 2 ||
 			send_subarea_PID_parameter_index == 3    ) {
 				subarea_PID_parameter_send(send_subarea_PID_parameter_index);
 				send_subarea_PID_parameter_index = 0;
 			}
+		chThdSleepMilliseconds(1);
+
 		
 		while (conf->can_status_rate_1 == 0) {
 			chThdSleepMilliseconds(10);

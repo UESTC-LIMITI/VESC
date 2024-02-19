@@ -43,8 +43,8 @@
 #define RPM_SCALE                           1e0   
 #define POS_SCALE                           1e6
 #define MULTITURN_POS_SCALE                 1e3
-#define SUBAREA_PARAMETER_KP_SCALE          1e6 
-#define SUBAREA_PARAMETER_DEADBAND_SCALE    1e4 
+#define SUBAREA_PARAMETER_KP_SCALE          1e4 
+#define SUBAREA_PARAMETER_DEADBAND_SCALE    1e2 
 
 typedef enum {                              //VESC里定义的CAN数据包类型
 	CAN_PACKET_SET_DUTY						= 0,
@@ -85,6 +85,12 @@ typedef struct {                             // VESC回传信息
 } motor_info_t;
 
 typedef struct {
+	bool para1_received;
+	bool para2_received;
+	bool para3_received;
+}subarea_PID_parameter_communication_t;
+
+typedef struct {
 	float subarea_1;
 	float subarea_2;
 	float kp1;
@@ -96,14 +102,8 @@ typedef struct {
 	float kd2;
 	float kd_proc2;
 	float deadband;
+	subarea_PID_parameter_communication_t com_status;
 }subarea_PID_parameter_t;
-
-typedef struct {
-	bool para1_received;
-	bool para2_received;
-	bool para3_received;
-}subarea_PID_parameter_communication_t;
-
 
 typedef enum {
 	CAN_SendData_TimeOut,
@@ -112,9 +112,9 @@ typedef enum {
 }VESC_ErrorCode_t;
 
 extern motor_info_t motor_info[8];
-extern uint8_t VESC_Send_Buffer[4];
-extern volatile subarea_PID_parameter_t subarea_PID_parameter;
-extern volatile subarea_PID_parameter_communication_t subarea_PID_parameter_communication;
+extern uint8_t VESC_Send_Buffer[BUFFER_MAX_LENTH];
+extern subarea_PID_parameter_t subarea_PID_parameter;
+//extern subarea_PID_parameter_communication_t subarea_PID_parameter_communication;
 
 float uchar2float(uint8_t* buffer, int32_t *index);
 int32_t uchar2int32(uint8_t* buffer, int32_t *index);
@@ -131,16 +131,18 @@ bool VESC_SetMultiturnPos(float value, uint8_t id, CAN_HandleTypeDef *hcan);
 bool VESC_SendCommand(CAN_PACKET_ID Cmd, float value, int32_t scale, uint8_t id, CAN_HandleTypeDef *hcan, uint32_t lenth);
 
 /******************************************分区PID控制部分函数开始*******************************************/
+bool VESC_ParamterRead(uint8_t id, CAN_HandleTypeDef *hcan);
 bool VESC_SetSubareaPIDPara1(subarea_PID_parameter_t *para, uint8_t id, CAN_HandleTypeDef *hcan);
 bool VESC_SetSubareaPIDPara2(subarea_PID_parameter_t *para, uint8_t id, CAN_HandleTypeDef *hcan);
 bool VESC_SetSubareaPIDPara3(subarea_PID_parameter_t *para, uint8_t id, CAN_HandleTypeDef *hcan);
-bool VESC_GetSetSubareaPIDPara1Request(uint8_t id, CAN_HandleTypeDef *hcan);
-bool VESC_GetSetSubareaPIDPara2Request(uint8_t id, CAN_HandleTypeDef *hcan);
-bool VESC_GetSetSubareaPIDPara3Request(uint8_t id, CAN_HandleTypeDef *hcan);
-bool VESC_GetSetSubareaPIDPara1(subarea_PID_parameter_t *para, uint8_t* buffer);
-bool VESC_GetSetSubareaPIDPara2(subarea_PID_parameter_t *para, uint8_t* buffer);
-bool VESC_GetSetSubareaPIDPara3(subarea_PID_parameter_t *para, uint8_t* buffer);
+bool VESC_GetSubareaPIDPara1Request(uint8_t id, CAN_HandleTypeDef *hcan);
+bool VESC_GetSubareaPIDPara2Request(uint8_t id, CAN_HandleTypeDef *hcan);
+bool VESC_GetSubareaPIDPara3Request(uint8_t id, CAN_HandleTypeDef *hcan);
+bool VESC_GetSubareaPIDPara1(subarea_PID_parameter_t *para, uint8_t* buffer);
+bool VESC_GetSubareaPIDPara2(subarea_PID_parameter_t *para, uint8_t* buffer);
+bool VESC_GetSubareaPIDPara3(subarea_PID_parameter_t *para, uint8_t* buffer);
 bool VESC_EnableSubareaPIDControl(uint8_t id, CAN_HandleTypeDef *hcan, uint32_t flag);
+bool VESC_StoreMcConfiguration(uint8_t id, CAN_HandleTypeDef *hcan);
 /******************************************分区PID控制部分函数结束*******************************************/
 
 

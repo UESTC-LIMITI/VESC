@@ -3096,26 +3096,26 @@ void mc_interface_set_pid_pos_multiturn (float pos) {
 bool mc_interface_get_subarea_PID_parameter (uint8_t index, uint8_t* buffer) {
 	int32_t ind = 0;
 	volatile mc_configuration* conf = &(m_motor_1.m_conf);
-	if(index != 1 || index != 2 || index != 3) {
+	if(index != 1 && index != 2 && index != 3) {
 		return false;
 	}
 	switch (index) {
 		case 1:
-			buffer_append_float16(buffer, conf->subarea_PID.kp1, 1e6, &ind);
-			buffer_append_float16(buffer, conf->subarea_PID.ki1, 1e6, &ind);
-			buffer_append_float16(buffer, conf->subarea_PID.kd1, 1e6, &ind);
-			buffer_append_float16(buffer, conf->subarea_PID.kd_proc1, 1e6, &ind);
+			buffer_append_float16(buffer, conf->subarea_PID.kp1, 1e4, &ind);
+			buffer_append_float16(buffer, conf->subarea_PID.ki1, 1e4, &ind);
+			buffer_append_float16(buffer, conf->subarea_PID.kd1, 1e4, &ind);
+			buffer_append_float16(buffer, conf->subarea_PID.kd_proc1, 1e4, &ind);
 			break;
 		case 2:
-			buffer_append_float16(buffer, conf->subarea_PID.kp2, 1e6, &ind);
-			buffer_append_float16(buffer, conf->subarea_PID.ki2, 1e6, &ind);
-			buffer_append_float16(buffer, conf->subarea_PID.kd2, 1e6, &ind);
-			buffer_append_float16(buffer, conf->subarea_PID.kd_proc2, 1e6, &ind);			
+			buffer_append_float16(buffer, conf->subarea_PID.kp2, 1e4, &ind);
+			buffer_append_float16(buffer, conf->subarea_PID.ki2, 1e4, &ind);
+			buffer_append_float16(buffer, conf->subarea_PID.kd2, 1e4, &ind);
+			buffer_append_float16(buffer, conf->subarea_PID.kd_proc2, 1e4, &ind);			
 			break;
 		case 3:
-			buffer_append_float16(buffer, conf->subarea_PID.subarea_1, 1e4, &ind);
-			buffer_append_float16(buffer, conf->subarea_PID.subarea_2, 1e4, &ind);
-			buffer_append_float16(buffer, conf->subarea_PID.deadband, 1e4, &ind);   //不知道scale保证的精度够不够，先用着吧2.18.2024
+			buffer_append_float16(buffer, conf->subarea_PID.subarea_1, 1e2, &ind);
+			buffer_append_float16(buffer, conf->subarea_PID.subarea_2, 1e2, &ind);
+			buffer_append_float16(buffer, conf->subarea_PID.deadband, 1e2, &ind);   //不知道scale保证的精度够不够，先用着吧2.18.2024
 			break;
 		default:
 			return false;
@@ -3132,29 +3132,29 @@ bool mc_interface_get_subarea_PID_parameter (uint8_t index, uint8_t* buffer) {
 bool mc_interface_set_subarea_PID_parameter1 (uint8_t* buffer) {
 	int32_t ind = 0;
 	volatile subarea_PID_t* para = &(m_motor_1.m_conf.subarea_PID);
-	para->kp1 = buffer_get_float16(buffer, 1e6, &ind);
-	para->ki1 = buffer_get_float16(buffer, 1e6, &ind);
-	para->kd1 = buffer_get_float16(buffer, 1e6, &ind);
-	para->kd_proc1 = buffer_get_float16(buffer, 1e6, &ind);
+	para->kp1 = buffer_get_float16(buffer, 1e4, &ind);
+	para->ki1 = buffer_get_float16(buffer, 1e4, &ind);
+	para->kd1 = buffer_get_float16(buffer, 1e4, &ind);
+	para->kd_proc1 = buffer_get_float16(buffer, 1e4, &ind);
 	return true;
 }
 
 bool mc_interface_set_subarea_PID_parameter2 (uint8_t* buffer) {
 	int32_t ind = 0;
 	volatile subarea_PID_t* para = &(m_motor_1.m_conf.subarea_PID);
-	para->kp2 = buffer_get_float16(buffer, 1e6, &ind);
-	para->ki2 = buffer_get_float16(buffer, 1e6, &ind);
-	para->kd2 = buffer_get_float16(buffer, 1e6, &ind);
-	para->kd_proc2 = buffer_get_float16(buffer, 1e6, &ind);
+	para->kp2 = buffer_get_float16(buffer, 1e4, &ind);
+	para->ki2 = buffer_get_float16(buffer, 1e4, &ind);
+	para->kd2 = buffer_get_float16(buffer, 1e4, &ind);
+	para->kd_proc2 = buffer_get_float16(buffer, 1e4, &ind);
 	return true;
 }
 
 bool mc_interface_set_subarea_PID_parameter3 (uint8_t* buffer) {
 	int32_t ind = 0;
 	volatile subarea_PID_t* para = &(m_motor_1.m_conf.subarea_PID);
-	para->subarea_1 = buffer_get_float16(buffer, 1e4, &ind);
-	para->subarea_2 = buffer_get_float16(buffer, 1e4, &ind);
-	para->deadband = buffer_get_float16(buffer, 1e4, &ind);
+	para->subarea_1 = buffer_get_float16(buffer, 1e2, &ind);
+	para->subarea_2 = buffer_get_float16(buffer, 1e2, &ind);
+	para->deadband = buffer_get_float16(buffer, 1e2, &ind);
 	return true;
 }
 

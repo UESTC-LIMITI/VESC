@@ -2,8 +2,8 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-28 09:12:06
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2024-02-18 20:46:40
- * @FilePath: \VESC_Code\VESC对接的库\新的 适配新固件\VESC_CAN.c
+ * @LastEditTime: 2024-02-18 22:24:05
+ * @FilePath: \MDK-ARM\RM3508\VESC_CAN.c
  * @Description: 
  * VESC_CAN 1.0 曹总写的库 回传有问题，发送和设置模式分开 10.28.2021
  * VESC_CAN 2.0 GTY改写   可自定义回传，将命令函数分为单独的函数，与RM3508的库类似 1.29.2024
@@ -20,28 +20,34 @@
 #include "VESC_CAN.h"
 
 motor_info_t motor_info[8] = {0};  //VESC回传数据储存在这里
-volatile subarea_PID_parameter_t subarea_PID_parameter = {0};
-volatile subarea_PID_parameter_communication_t subarea_PID_parameter_communication = {false};
+subarea_PID_parameter_t subarea_PID_parameter = {0};
+//subarea_PID_parameter_communication_t subarea_PID_parameter_communication = {false};
 
-bool VESC_ParamterInit(uint8_t id, CAN_HandleTypeDef *hcan) {
-	subarea_PID_parameter_t* para = &subarea_PID_parameter;
-	subarea_PID_parameter_communication_t* para_com_status = &subarea_PID_parameter_communication;
+/**
+ * @description:                    初始化从VESC获取参数
+ * @param {uint8_t} id              VESC id
+ * @param {CAN_HandleTypeDef} *hcan 目标CAN
+ * @return {*}
+ */
+bool VESC_ParamterRead(uint8_t id, CAN_HandleTypeDef *hcan) {
+//	subarea_PID_parameter_t* para = &subarea_PID_parameter;
+	subarea_PID_parameter_communication_t* para_com_status = &(subarea_PID_parameter.com_status);
 	para_com_status->para1_received = false;
 	para_com_status->para2_received = false;
 	para_com_status->para3_received = false;
 	while (para_com_status->para1_received == false) {
-		VESC_GetSetSubareaPIDPara1Request(id, hcan);
+		VESC_GetSubareaPIDPara1Request(id, hcan);
 		HAL_Delay(50);
 	}
 	while (para_com_status->para2_received == false) {
-		VESC_GetSetSubareaPIDPara2Request(id, hcan);
+		VESC_GetSubareaPIDPara2Request(id, hcan);
 		HAL_Delay(50);
 	}
 	while (para_com_status->para3_received == false) {
-		VESC_GetSetSubareaPIDPara3Request(id, hcan);
+		VESC_GetSubareaPIDPara3Request(id, hcan);
 		HAL_Delay(50);
 	}
-	
+	return true;
 }
 
 /**
@@ -230,33 +236,30 @@ bool VESC_SetSubareaPIDPara3(subarea_PID_parameter_t *para, uint8_t id, CAN_Hand
  * @param {CAN_HandleTypeDef} *hcan 目标CAN
  * @return {*}               
  */
-bool VESC_GetSetSubareaPIDPara1Request(uint8_t id, CAN_HandleTypeDef *hcan) {
+bool VESC_GetSubareaPIDPara1Request(uint8_t id, CAN_HandleTypeDef *hcan) {
 	if(id > 255 || id <= 0) {
 		VESC_Error_Handler(Set_id_Wrong);
 	}
-	int32_t ind = 0;
 	uint32_t eid = (id & 0xff) | ((uint32_t)CAN_PACKET_GET_SUBAREA_PARA1 << 8);
 	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
 	VESC_CAN_SendData(hcan, id, eid, 4);
 	return true;
 }
 
-bool VESC_GetSetSubareaPIDPara2Request(uint8_t id, CAN_HandleTypeDef *hcan) {
+bool VESC_GetSubareaPIDPara2Request(uint8_t id, CAN_HandleTypeDef *hcan) {
 	if(id > 255 || id <= 0) {
 		VESC_Error_Handler(Set_id_Wrong);
 	}
-	int32_t ind = 0;
 	uint32_t eid = (id & 0xff) | ((uint32_t)CAN_PACKET_GET_SUBAREA_PARA2 << 8);
 	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
 	VESC_CAN_SendData(hcan, id, eid, 4);
 	return true;
 }
 
-bool VESC_GetSetSubareaPIDPara3Request(uint8_t id, CAN_HandleTypeDef *hcan) {
+bool VESC_GetSubareaPIDPara3Request(uint8_t id, CAN_HandleTypeDef *hcan) {
 	if(id > 255 || id <= 0) {
 		VESC_Error_Handler(Set_id_Wrong);
 	}
-	int32_t ind = 0;
 	uint32_t eid = (id & 0xff) | ((uint32_t)CAN_PACKET_GET_SUBAREA_PARA3 << 8);
 	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
 	VESC_CAN_SendData(hcan, id, eid, 4);
@@ -270,7 +273,7 @@ bool VESC_GetSetSubareaPIDPara3Request(uint8_t id, CAN_HandleTypeDef *hcan) {
  * @param {uint8_t*} buffer               接收buffer
  * @return {*}
  */
-bool VESC_GetSetSubareaPIDPara1(subarea_PID_parameter_t *para, uint8_t* buffer) {
+bool VESC_GetSubareaPIDPara1(subarea_PID_parameter_t *para, uint8_t* buffer) {
 	int32_t ind = 0;
 	para->kp1 = buffer_get_float16(buffer, SUBAREA_PARAMETER_KP_SCALE, &ind);
 	para->ki1 = buffer_get_float16(buffer, SUBAREA_PARAMETER_KP_SCALE, &ind);
@@ -279,7 +282,7 @@ bool VESC_GetSetSubareaPIDPara1(subarea_PID_parameter_t *para, uint8_t* buffer) 
 	return true;
 }
 
-bool VESC_GetSetSubareaPIDPara2(subarea_PID_parameter_t *para, uint8_t* buffer) {
+bool VESC_GetSubareaPIDPara2(subarea_PID_parameter_t *para, uint8_t* buffer) {
 	int32_t ind = 0;
 	para->kp2 = buffer_get_float16(buffer, SUBAREA_PARAMETER_KP_SCALE, &ind);
 	para->ki2 = buffer_get_float16(buffer, SUBAREA_PARAMETER_KP_SCALE, &ind);
@@ -288,7 +291,7 @@ bool VESC_GetSetSubareaPIDPara2(subarea_PID_parameter_t *para, uint8_t* buffer) 
 	return true;
 }
 
-bool VESC_GetSetSubareaPIDPara3(subarea_PID_parameter_t *para, uint8_t* buffer) {
+bool VESC_GetSubareaPIDPara3(subarea_PID_parameter_t *para, uint8_t* buffer) {
 	int32_t ind = 0;
 	para->subarea_1 = buffer_get_float16(buffer, SUBAREA_PARAMETER_DEADBAND_SCALE, &ind);
 	para->subarea_2 = buffer_get_float16(buffer, SUBAREA_PARAMETER_DEADBAND_SCALE, &ind);
@@ -304,13 +307,30 @@ bool VESC_GetSetSubareaPIDPara3(subarea_PID_parameter_t *para, uint8_t* buffer) 
  * @return {*}
  */
 bool VESC_EnableSubareaPIDControl(uint8_t id, CAN_HandleTypeDef *hcan, uint32_t flag) {
-	if(id > 255 || id <= 0) {
+	if (id > 255 || id <= 0) {
 		VESC_Error_Handler(Set_id_Wrong);
 	}
 	int32_t ind = 0;
-	uint32_t eid = (id & 0xff) | ((uint32_t)CAN_PACKET_SET_SUBAREA_PARA3 << 8);
+	uint32_t eid = (id & 0xff) | ((uint32_t)CAN_PACKET_ENABLE_SUBAREA_PID << 8);
 	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
 	buffer_append_uint32(VESC_Send_Buffer, flag, &ind);
+	VESC_CAN_SendData(hcan, id, eid, 4);
+	return true;
+}
+
+/**
+ * @description:                    让VESC把电机设置储存进eeprom
+ * @param {uint8_t} id              VESC id
+ * @param {CAN_HandleTypeDef} *hcan 目标CAN
+ * @return {*}
+ */
+bool VESC_StoreMcConfiguration(uint8_t id, CAN_HandleTypeDef *hcan) {
+	if (id > 255 || id <= 0) {
+		VESC_Error_Handler(Set_id_Wrong);
+	}
+//	int32_t ind = 0;
+	uint32_t eid = (id & 0xff) | ((uint32_t)CAN_PACKET_STORE_MC_CONFIGURATION << 8);
+	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
 	VESC_CAN_SendData(hcan, id, eid, 4);
 	return true;
 }
@@ -378,6 +398,8 @@ bool VESC_CAN_decode(uint32_t ExtID, uint8_t *pData) {
 	uint8_t id = ExtID & 0x00000FF;
 	int32_t index = 0;
 	bool ret = false;
+	
+	subarea_PID_parameter_t* para = &subarea_PID_parameter;
 
 #if defined(FLOAT_TRANSMITTED)
 	switch (packet_id) {
@@ -409,40 +431,51 @@ bool VESC_CAN_decode(uint32_t ExtID, uint8_t *pData) {
 		case (uint32_t)CAN_PACKET_STATUS:
 			motor_info[id-1].rpm = (uchar2int32(pData, &index) / RPM_SCALE);
 			motor_info[id-1].duty_cycle = (uchar2int32(pData, &index) / DUTY_CYCLE_SCALE);
+			ret = true;
 			break;
 
 		case (uint32_t)CAN_PACKET_STATUS_2:
 			motor_info[id-1].pos = (uchar2int32(pData, &index) / POS_SCALE);
 			motor_info[id-1].mul_pos = (uchar2int32(pData, &index) / MULTITURN_POS_SCALE);
-			
+			ret = true;
 			break;
+		
 		case (uint32_t)CAN_PACKET_STATUS_3:
 			motor_info[id-1].tot_current_in = (uchar2int32(pData, &index) / CURRENT_SCALE);
 			motor_info[id-1].tot_voltage = (uchar2int32(pData, &index) / VOLTAGE_SCALE);
 			motor_info[id-1].power = motor_info[id-1].tot_current_in * motor_info[id-1].tot_voltage;
+			ret = true;
 			break;
 
 		case (uint32_t)CAN_PACKET_STATUS_4:
 			//目前 do nothing			
+			ret = true;
 			break;
 
 		case (uint32_t)CAN_PACKET_GET_SUBAREA_PARA1:
-			VESC_GetSetSubareaPIDPara1(&subarea_PID_parameter, pData);
+			VESC_GetSubareaPIDPara1(para, pData);
+			para->com_status.para1_received = true;
+			ret = true;
 			break;
 
 		case (uint32_t)CAN_PACKET_GET_SUBAREA_PARA2:
-			VESC_GetSetSubareaPIDPara2(&subarea_PID_parameter, pData);
+			VESC_GetSubareaPIDPara2(para, pData);
+			para->com_status.para2_received = true;
+			ret = true;
 			break;
 
 		case (uint32_t)CAN_PACKET_GET_SUBAREA_PARA3:
-			VESC_GetSetSubareaPIDPara3(&subarea_PID_parameter, pData);
+			VESC_GetSubareaPIDPara3(para, pData);
+			para->com_status.para3_received = true;
+			ret = true;
 			break;
 
 		default:
-			return false;
+			ret = false;
+			break;
 	}
 #endif
-	return true;
+	return ret;
 }
 
 /**

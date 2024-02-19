@@ -403,10 +403,11 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
  * 1. 定义好参数 done
  * 2. 将单圈和多圈控制的PID函数里都应用上分区控制 done
  * 3. 写一堆CAN协议 考虑如何用单片机设置和提取PID参数 done
- * 4. 写对应的库来调PID
- * 5. 测试库
+ * 4. 写对应的库来调PID done
+ * 5. 测试库 done 
  * 6. 考虑如何储存调好的参数 下载？
  **************************************************************************/
+/*
 	m_motor_1.m_conf->subarea_PID.initialized = false;                     \
 	m_motor_1.m_conf->subarea_PID.subarea_1 = SUBAREA1;                    \
 	m_motor_1.m_conf->subarea_PID.subarea_2 = SUBAREA2;                    \
@@ -420,7 +421,8 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 	m_motor_1.m_conf->subarea_PID.kd_proc2 = 0.0002 * 3;                   \
 	m_motor_1.m_conf->subarea_PID.enable_subarea_control = false;          \
 	m_motor_1.m_conf->subarea_PID.deadband = 0.08;                         \
-	m_motor_1.m_conf->subarea_PID.initialized = true;                     \
+	m_motor_1.m_conf->subarea_PID.initialized = true;                      \
+/*
 /**************************************************************************/
 
 	virtual_motor_init(conf_m1);
