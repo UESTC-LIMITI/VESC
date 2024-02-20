@@ -424,6 +424,20 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 	m_motor_1.m_conf->subarea_PID.initialized = true;                      \
 /*
 /**************************************************************************/
+/**
+ * shoot参数初始化
+ *
+ **************************************************************************/
+	m_motor_1.m_conf->shoot_parameter.accel_current = 40;                  \
+	m_motor_1.m_conf->shoot_parameter.brake_current = 60;                  \
+	m_motor_1.m_conf->shoot_parameter.target_speed = 10000;                \
+	m_motor_1.m_conf->shoot_parameter.home_angle = 10;                     \
+	m_motor_1.m_conf->shoot_parameter.SHOOT_STATUS = SHOOT_DISABLE;        \
+	m_motor_1.m_conf->shoot_parameter.shoot_excute = false;                \
+	m_motor_1.m_conf->shoot_parameter.homing_excute = false;               \
+	m_motor_1.m_conf->shoot_parameter.auto_homing = false;                 \
+	m_motor_1.m_conf->shoot_parameter.count = 0;                           \
+/**************************************************************************/
 
 	virtual_motor_init(conf_m1);
 

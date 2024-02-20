@@ -2,7 +2,7 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-28 09:12:06
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2024-02-18 20:10:02
+ * @LastEditTime: 2024-02-20 10:44:47
  * @FilePath: \VESC_Code\VESC对接的库\新的 适配新固件\VESC_CAN.h
  * @Description: 
  * VESC_CAN 1.0 曹总写的库 回传有问题，发送和设置模式分开 10.28.2021
@@ -52,18 +52,15 @@ typedef enum {                              //VESC里定义的CAN数据包类型
 	CAN_PACKET_SET_CURRENT_BRAKE			= 2,
 	CAN_PACKET_SET_RPM						= 3,
 	CAN_PACKET_SET_POS						= 4,
-	CAN_PACKET_SET_POS_MULTITURN			= 74,  //2.15.2024新增
-	CAN_PACKET_SET_ACCEL_CURRENT			= 63,  
-	CAN_PACKET_SET_TARGET_SPEED			    = 65,  
-	CAN_PACKET_SET_BRAKE_CURRENT			= 68,
-	CAN_PACKET_SET_CUSTOM_MODE				= 69,
-	CAN_PACKET_SET_HOME			            = 75,
-	CAN_PACKET_HOMING			            = 76,
+
+	CAN_PACKET_SET_POS_MULTITURN			= 74,  //2.15.2024新增 多圈位置
+
 	CAN_PACKET_STATUS                       = 9,
 	CAN_PACKET_STATUS_2						= 14,
 	CAN_PACKET_STATUS_3						= 15,
 	CAN_PACKET_STATUS_4						= 16,
 	CAN_PACKET_SHUTDOWN						= 31,
+
 	CAN_PACKET_GET_SUBAREA_PARA1			= 77,  //2.18.2024新增 分区PID参数读取和设置
 	CAN_PACKET_GET_SUBAREA_PARA2			= 78,
 	CAN_PACKET_GET_SUBAREA_PARA3			= 79,
@@ -72,6 +69,17 @@ typedef enum {                              //VESC里定义的CAN数据包类型
 	CAN_PACKET_SET_SUBAREA_PARA3			= 82,
 	CAN_PACKET_STORE_MC_CONFIGURATION		= 83,
 	CAN_PACKET_ENABLE_SUBAREA_PID	        = 84,
+
+												   //2.20.2024 新增 重写一套shoot
+	CAN_PACKET_ENABLE_SHOOT	                = 85,  //使能shoot
+	CAN_PACKET_EXCUTE_SHOOT	                = 86,  //执行shoot，开始加速
+	CAN_PACKET_ENABLE_AUTO_HOMING           = 87,  
+	CAN_PACKET_SET_ACCEL_CURRENT			= 63,  
+	CAN_PACKET_SET_TARGET_SPEED			    = 65,  
+	CAN_PACKET_SET_BRAKE_CURRENT			= 68,
+	CAN_PACKET_SET_HOME			            = 75,
+	CAN_PACKET_HOMING			            = 76,
+
 } CAN_PACKET_ID;
 
 typedef struct {                             // VESC回传信息           
@@ -104,6 +112,16 @@ typedef struct {
 	float deadband;
 	subarea_PID_parameter_communication_t com_status;
 }subarea_PID_parameter_t;
+
+typedef struct {
+	float accel_current;
+	float target_speed;
+	float brake_current;
+	float home_angle;
+	bool shoot_excute;
+	bool homing_excute;
+	bool auto_homing;
+}Shoot_Parameter_t;
 
 typedef enum {
 	CAN_SendData_TimeOut,
@@ -144,6 +162,20 @@ bool VESC_GetSubareaPIDPara3(subarea_PID_parameter_t *para, uint8_t* buffer);
 bool VESC_EnableSubareaPIDControl(uint8_t id, CAN_HandleTypeDef *hcan, uint32_t flag);
 bool VESC_StoreMcConfiguration(uint8_t id, CAN_HandleTypeDef *hcan);
 /******************************************分区PID控制部分函数结束*******************************************/
+
+/*********************************shoot相关开始****************************************/
+#define SHOOT_VESC_ID 1
+#define SHOOT_VESC_HCAN hcan1
+bool SHOOT_ParameterInit (void);
+bool SHOOT_EnableShoot (uint32_t flag);
+bool SHOOT_SetAccelCurrent (float acc_cur);
+bool SHOOT_SetBrakeCurrent (float brk_cur);
+bool SHOOT_SetTargetSpeed (float tar_spd);
+bool SHOOT_SetHome (void);
+bool SHOOT_EnableAutoHoming (uint32_t flag);
+bool SHOOT_ExcuteShoot (uint32_t flag);//加一个flag保险起见
+bool SHOOT_ExcuteHoming (void);
+/*********************************shoot相关结束****************************************/
 
 
 static void VESC_Error_Handler(VESC_ErrorCode_t Code);

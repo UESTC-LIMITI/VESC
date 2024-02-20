@@ -1741,99 +1741,82 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 			break;
 
         //以下都是shoot部分
+		case CAN_PACKET_ENABLE_SHOOT:  //使能shoot
+			ind = 0;
+			mc_interface_shoot_enable(buffer_get_uint32(data8, &ind));
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_ENABLE_AUTO_HOMING:  //使能auto_homing 这下是全自动流程了
+			ind = 0;
+			mc_interface_auto_homing_enable(buffer_get_uint32(data8, &ind));
+			timeout_reset();
+			break;
+
 		case CAN_PACKET_SET_ACCEL_CURRENT:
 			ind = 0;
-			accel_current =(buffer_get_float32(data8, 1e3, &ind));
-			dI = accel_current / 600.0;
-			timeout_reset();
-			break;
-
-		case CAN_PACKET_SET_LIMIT_SPEED:
-			ind = 0;
-			limit_speed = (buffer_get_float32(data8, 1e0, &ind));
-			timeout_reset();
-			break;
-
-		case CAN_PACKET_SET_TARGET_SPEED:
-			ind = 0;
-			target_speed = (buffer_get_float32(data8, 1e0, &ind));
-			timeout_reset();
-			break;
-
-		case CAN_PACKET_SET_LIMIT_POS:
-			ind = 0;
-			limit_pos = (buffer_get_float32(data8, 50, &ind));
-			timeout_reset();
-			break;
-
-		case CAN_PACKET_SET_SAMPLE_POINTS:
-			ind = 0;
-			sample_points = (buffer_get_int32(data8, &ind));
+			mc_interface_set_shoot_accel_current(buffer_get_float32(data8, 1e3, &ind));
 			timeout_reset();
 			break;
 
 		case CAN_PACKET_SET_BRAKE_CURRENT:
 			ind = 0;
-			brake_current = (buffer_get_float32(data8, 1e3, &ind));
+			mc_interface_set_shoot_brake_current(buffer_get_float32(data8, 1e3, &ind));
 			timeout_reset();
 			break;
 
-		case CAN_PACKET_SET_CUSTOM_MODE:
+		case CAN_PACKET_SET_TARGET_SPEED:
 			ind = 0;
-			int temp = (buffer_get_int32(data8, &ind));
-			if (custom_mode == CUSTOM_MODE_NONE && state_now == 0)
-			{
-				// memset(speed_record, 0, sizeof(speed_record));
-				record_counter = 0;
-				switch (temp) {
-				case 1:
-					state_now++;
-					mc_interface_set_current(accel_current);
-					break;
-				default:
-					mc_interface_release_motor();
-					break;
-				}
-			}
-			custom_mode = ((CUSTOM_MODE)temp);
+			mc_interface_set_shoot_target_speed(buffer_get_float32(data8, 1e0, &ind));
 			timeout_reset();
 			break;
 
 		case CAN_PACKET_SET_HOME:
+			mc_interface_set_shoot_home(mc_interface_get_pos_multiturn());
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_EXCUTE_SHOOT:  //执行shoot，开始加速
 			ind = 0;
-			home_angle = mc_interface_get_pos_multiturn();
+			mc_interface_shoot_excute_enable(buffer_get_uint32(data8, &ind));
 			timeout_reset();
 			break;
 
 		case CAN_PACKET_HOMING:
 			homing_flag = 1;
-			mc_interface_set_pid_pos_multiturn(home_angle);
-			ind = 0;
+			mc_interface_shoot_homing();
 			timeout_reset();
 			break;
+
+		// case CAN_PACKET_SET_CUSTOM_MODE:
+		// 	ind = 0;
+		// 	int temp = (buffer_get_int32(data8, &ind));
+		// 	if (custom_mode == CUSTOM_MODE_NONE && state_now == 0)
+		// 	{
+		// 		// memset(speed_record, 0, sizeof(speed_record));
+		// 		record_counter = 0;
+		// 		switch (temp) {
+		// 		case 1:
+		// 			state_now++;
+		// 			mc_interface_set_current(accel_current);
+		// 			break;
+		// 		default:
+		// 			mc_interface_release_motor();
+		// 			break;
+		// 		}
+		// 	}
+		// 	custom_mode = ((CUSTOM_MODE)temp);
+		// 	timeout_reset();
+		// 	break;
 
 		case CAN_PACKET_ALIVE:
 			ind = 0;
 			timeout_reset();
 			break;
+		//以上是shoot部分
 
-		case CAN_PACKET_SET_RESET_SPEED:
-			ind = 0;
-			reset_speed = (buffer_get_float32(data8, 1e0, &ind));
-			timeout_reset();
-			break;
 
-		case CAN_PACKET_SET_RESET_POS_SAMPLE_POINTS:
-			ind = 0;
-			reset_pos_sample_points = (buffer_get_int32(data8, &ind));
-			timeout_reset();
-			break;
 
-		case CAN_PACKET_SET_TARGET_DUTY:
-			ind = 0;
-			target_duty = (buffer_get_float32(data8, 1e5, &ind));
-			timeout_reset();
-			break;
 /****************************************** custom 部分结束~~ ********************************************/
 
 

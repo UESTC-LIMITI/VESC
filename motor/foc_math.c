@@ -601,12 +601,13 @@ void foc_run_pid_control_pos_multiturn(bool index_found, float dt, motor_all_sta
 
 	// Calculate output
 	float output = p_term + motor->m_pos_i_term + d_term + d_term_proc;
+
     //以下这些是shoot关于自动归位的内容
 	if (homing_flag) {
-		if (error_abs > 20) {
+		if (error_abs > 5) {
 			utils_truncate_number(&output, -0.06, 0.06);
 		} else {
-			utils_truncate_number(&output, -error_abs/20, error_abs/20);
+			utils_truncate_number(&output, -0.5, 0.5);
 		}
 		if (error_abs < 1) {
 			homing_count ++;

@@ -2,8 +2,8 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-28 09:12:06
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2024-02-18 22:24:05
- * @FilePath: \MDK-ARM\RM3508\VESC_CAN.c
+ * @LastEditTime: 2024-02-20 10:41:39
+ * @FilePath: \VESC_Code\VESC对接的库\新的 适配新固件\VESC_CAN.c
  * @Description: 
  * VESC_CAN 1.0 曹总写的库 回传有问题，发送和设置模式分开 10.28.2021
  * VESC_CAN 2.0 GTY改写   可自定义回传，将命令函数分为单独的函数，与RM3508的库类似 1.29.2024
@@ -21,7 +21,7 @@
 
 motor_info_t motor_info[8] = {0};  //VESC回传数据储存在这里
 subarea_PID_parameter_t subarea_PID_parameter = {0};
-//subarea_PID_parameter_communication_t subarea_PID_parameter_communication = {false};
+Shoot_Parameter_t shoot_parameter = {0};
 
 /**
  * @description:                    初始化从VESC获取参数
@@ -364,7 +364,7 @@ bool VESC_SendCommand(CAN_PACKET_ID Cmd, float value, int32_t scale, uint8_t id,
 
 
 /**
- * @description:             类型转换函数
+ * @description:             类型转换函数  (但是现在直接用buffer.c/h里的了)
  * @param {uint8_t*} buffer  uint8的数组
  * @param {uint32_t} *index  外部序号，用于长度大于4的数组连续转换，自增
  * @return {*}               返回需要的类型
@@ -378,7 +378,7 @@ float uchar2float(uint8_t* buffer, int32_t *index) {
 }
 
 int32_t uchar2int32(uint8_t* buffer, int32_t *index) {
-	int32_t temp = 0;
+	int32_t temp = 0; 
 	temp |= ((0xff & buffer[(*index)++]) << 24);
 	temp |= ((0xff & buffer[(*index)++]) << 16);
 	temp |= ((0xff & buffer[(*index)++]) << 8);
@@ -387,13 +387,101 @@ int32_t uchar2int32(uint8_t* buffer, int32_t *index) {
 }
 /*************************************************************************************/
 
+/*********************************shoot相关开始****************************************/
+bool SHOOT_ParameterInit (void) {
+	Shoot_Parameter_t* para = &shoot_parameter;
+	para->accel_current = 40;
+	para->brake_current = 80;
+	para->target_speed = 10000;
+	para->home_angle = 20;
+	para->auto_homing = false;
+	para->homing_excute = false;
+	para->shoot_excute = false;
+}
+
+bool SHOOT_EnableShoot (uint32_t flag) {
+	int32_t ind = 0;
+	uint32_t eid = (SHOOT_VESC_ID & 0xff) | ((uint32_t)CAN_PACKET_ENABLE_SHOOT << 8);
+	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
+	buffer_append_uint32(VESC_Send_Buffer, flag, &ind);
+	VESC_CAN_SendData(hcan, id, eid, 4);
+	return true;
+}
+
+bool SHOOT_EnableAutoHoming (uint32_t flag) {
+	int32_t ind = 0;
+	uint32_t eid = (SHOOT_VESC_ID & 0xff) | ((uint32_t)CAN_PACKET_ENABLE_AUTO_HOMING << 8);
+	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
+	buffer_append_uint32(VESC_Send_Buffer, flag, &ind);
+	VESC_CAN_SendData(hcan, id, eid, 4);
+	return true;
+}
+
+bool SHOOT_SetAccelCurrent (float acc_cur) {
+	
+	int32_t ind = 0;
+	uint32_t eid = (SHOOT_VESC_ID & 0xff) | ((uint32_t)CAN_PACKET_SET_ACCEL_CURRENT << 8);
+	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
+	buffer_append_float32(VESC_Send_Buffer, acc_cur, CURRENT_SCALE, &ind);
+	VESC_CAN_SendData(hcan, id, eid, 4);
+	return true;
+}
+
+bool SHOOT_SetBrakeCurrent (float brk_cur) {
+	
+	int32_t ind = 0;
+	uint32_t eid = (SHOOT_VESC_ID & 0xff) | ((uint32_t)CAN_PACKET_SET_BRAKE_CURRENT << 8);
+	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
+	buffer_append_float32(VESC_Send_Buffer, brk_cur, CURRENT_SCALE, &ind);
+	VESC_CAN_SendData(hcan, id, eid, 4);
+	return true;
+}
+
+bool SHOOT_SetTargetSpeed (float tar_spd) {
+	
+	int32_t ind = 0;
+	uint32_t eid = (SHOOT_VESC_ID & 0xff) | ((uint32_t)CAN_PACKET_SET_TARGET_SPEED << 8);
+	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
+	buffer_append_float32(VESC_Send_Buffer, tar_spd, RPM_SCALE, &ind);
+	VESC_CAN_SendData(hcan, id, eid, 4);
+	return true;
+}
+
+bool SHOOT_SetHome (void) {
+	int32_t ind = 0;
+	uint32_t eid = (SHOOT_VESC_ID & 0xff) | ((uint32_t)CAN_PACKET_SET_HOME << 8);
+	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
+	VESC_CAN_SendData(hcan, id, eid, 4);
+	return true;
+}
+
+bool SHOOT_ExcuteShoot (uint32_t flag) {  //加一个flag保险起见
+	int32_t ind = 0;
+	uint32_t eid = (SHOOT_VESC_ID & 0xff) | ((uint32_t)CAN_PACKET_EXCUTE_SHOOT << 8);
+	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
+	buffer_append_uint32(VESC_Send_Buffer, flag, &ind);
+	VESC_CAN_SendData(hcan, id, eid, 4);
+	return true;
+}
+
+bool SHOOT_ExcuteHoming (void) {
+	int32_t ind = 0;
+	uint32_t eid = (SHOOT_VESC_ID & 0xff) | ((uint32_t)CAN_PACKET_HOMING << 8);
+	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
+	VESC_CAN_SendData(hcan, id, eid, 4);
+	return true;
+}
+
+/*********************************shoot相关结束****************************************/
+
+
 /**
  * @description:            CAN消息解码  
  * @param {uint32_t} ExtID  收到的eid
  * @param {uint8_t} pData   接收buffer
  * @return {*}              成功返回 1 不成功返回 0
  */
-bool VESC_CAN_decode(uint32_t ExtID, uint8_t *pData) {
+bool VESC_CAN_decode (uint32_t ExtID, uint8_t *pData) {
 	uint32_t packet_id = ExtID >> 8;
 	uint8_t id = ExtID & 0x00000FF;
 	int32_t index = 0;

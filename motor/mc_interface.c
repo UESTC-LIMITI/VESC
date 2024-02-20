@@ -223,6 +223,8 @@ void mc_interface_init(void) {   //上位机与下位机交互的init？
 
 	encoder_init(&motor_now()->m_conf);
 
+	mc_interface_set_pwm_callback(mc_interface_custom_pwm_callback);  //设置自定义pwm回调函数
+
 	// Initialize selected implementation
 	switch (motor_now()->m_conf.motor_type) {
 	case MOTOR_TYPE_BLDC:
@@ -1949,7 +1951,7 @@ void mc_interface_mc_timer_isr(bool is_second_motor) {
 	}
 
 	if (pwn_done_func) {
-		pwn_done_func();
+		pwn_done_func();  //app_custom 里面说的每个pwm周期结束后的回调函数就在这里执行
 	}
 
 	motor->m_motor_current_sum += current_filtered;
@@ -2712,7 +2714,7 @@ static THD_FUNCTION(timer_thread, arg) {
 	}
 }
 
-static void update_stats(volatile motor_if_state_t *motor) {
+static void update_stats(volatile motor_if_state_t *motor) {  //更新各种状态的函数！！
 	mc_interface_select_motor_thread(motor == (&m_motor_1) ? 1 : 2);
 
 	setup_values val = mc_interface_get_setup_values();
@@ -3181,6 +3183,150 @@ bool mc_interface_subarea_PID_control_enable (uint32_t flag) {
 		para->enable_subarea_control = false;
 	}
 	return true;
+}
+
+
+/**
+ * 2.19.2024 重写一套发射，累死我了，没睡够 @_@
+ * 思路是把发射状态机写在PWM周期的回调函数里，高速执行
+ * 分为全自动（自动homing）和半自动（指令homing）
+ * 启动的置位、参数设置都通过CAN总线完成，流程完成的置位：根据设置好的检测条件，由VESC自己判断完成
+ * 设置好的发射参数可以存在flash里，下次自动读取
+ * TODO：
+ * 1. 写完CAN接收解码->置位->高速轮询流程检测到标志位变化，自动执行一整套状态机->检测到结束条件，置结束位->等待下一流程的启动置位 done
+ * 2. 在库中添加相关CAN通信函数，能够通过CAN控制发射、改变参数
+ * 3. 测试
+ * 4. 在流程中加一些稳定性判断条件，比如检测到加速时间过长就刹车
+ * 5. 能把参数存进flash和读出来到单片机
+ */
+volatile Shoot_Parameter_t* mc_interface_get_shoot_parameter (void) {
+	return &(m_motor_1.m_conf.shoot_parameter);
+}
+
+bool mc_interface_set_shoot_home (float home_angle) {
+	volatile Shoot_Parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);
+	para->home_angle = home_angle;
+	return true;
+}
+
+bool mc_interface_shoot_homing (void) {
+	volatile Shoot_Parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);
+	para->homing_excute = true;
+	return true;
+}
+
+bool mc_interface_shoot_enable (uint32_t flag) {
+	volatile Shoot_Parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);
+	if (flag > 0) {
+		para->SHOOT_STATUS = SHOOT_READY;
+	} else {
+		para->SHOOT_STATUS = SHOOT_DISABLE;
+	}
+	return true;
+}
+
+bool mc_interface_shoot_excute_enable (uint32_t flag) {
+	volatile Shoot_Parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);
+	if (flag > 0) {
+		para->shoot_excute = true;
+	} else {
+		para->shoot_excute = false;
+	}
+	return true;
+}
+
+bool mc_interface_auto_homing_enable (uint32_t flag) {
+	volatile Shoot_Parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);
+	if (flag > 0) {
+		para->auto_homing = true;
+	} else {
+		para->auto_homing = false;
+	}
+	return true;
+}
+
+extern bool homing_flag;
+extern int homing_count;
+
+bool mc_interface_shoot_excute (volatile Shoot_Parameter_t* para) {
+	if (para->SHOOT_STATUS == SHOOT_DISABLE) {
+		return false;
+	}
+	switch (para->SHOOT_STATUS) {
+	case SHOOT_READY:
+		if (para->shoot_excute == true) {
+			para->shoot_excute = false;
+			para->SHOOT_STATUS = SHOOT_ACCEL;
+		}
+		break;
+	
+	case SHOOT_ACCEL:
+		mc_interface_set_current(para->accel_current);
+		if (mc_interface_get_rpm() >= para->target_speed) {
+			mc_interface_set_brake_current(para->brake_current);
+			para->SHOOT_STATUS = SHOOT_BREAK;
+		}
+		break;
+	
+	case SHOOT_BREAK:
+		mc_interface_set_brake_current(para->brake_current);
+		if (mc_interface_get_rpm() < 20) {
+			para->count++;
+		} else { para->count = 0; }
+		if (para->count > 10000) {
+			para->count = 10000;
+			if (para->auto_homing == true) {
+				mc_interface_shoot_homing();
+				para->count = 0;
+				para->SHOOT_STATUS = SHOOT_HOMING;
+			} else if (para->homing_excute == true) {
+				mc_interface_shoot_homing();
+				para->count = 0;
+				para->SHOOT_STATUS = SHOOT_HOMING;
+			}
+		}
+		break;
+	
+	case SHOOT_HOMING:
+		mc_interface_shoot_homing();
+		float error_abs = fabsf(mc_interface_get_pos_multiturn() - (para->home_angle));
+		if (error_abs < 1) {
+			para->count++;
+		} else { para->count = 0; }
+		if (para->count > 10000 && homing_flag == false) {
+			para->count = 0;
+			para->SHOOT_STATUS = SHOOT_READY;
+			para->shoot_excute = false;
+		}
+		break;
+
+	default:
+		break;
+	}
+	return true;
+}
+
+bool mc_interface_set_shoot_accel_current (float acc_cur) {
+	volatile Shoot_Parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);	
+	para->accel_current = acc_cur;
+	return true;
+}
+
+bool mc_interface_set_shoot_brake_current (float brk_cur) {
+	volatile Shoot_Parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);	
+	para->brake_current = brk_cur;
+	return true;
+}
+
+bool mc_interface_set_shoot_target_speed (float tar_spd) {
+	volatile Shoot_Parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);	
+	para->target_speed = tar_spd;
+	return true;
+}
+
+void mc_interface_custom_pwm_callback (void) {
+	mc_interface_shoot_excute(&(m_motor_1.m_conf.shoot_parameter));
+	//可以自定义一些逻辑
 }
 
 /**************************************************************************************************/

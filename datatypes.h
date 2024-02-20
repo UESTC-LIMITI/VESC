@@ -60,6 +60,61 @@ typedef struct  {
 #define SUBAREA1    1.5
 #define SUBAREA2    0.2
 
+// int sampled_points = 0;
+// uint8_t finish_flag = 0;
+// float brake_pos = 0;
+// float brake_speed = 0;
+// uint8_t state_now = 0;
+// float max_speed_record = 0;
+// float max_speed_pos_record = 0;
+// float reset_pos = 0;
+// float reset_pos_deadband = 0.2;
+
+// int16_t speed_record[SEND_NUM] = {0};
+// int16_t pos_record[SEND_NUM] = {0};
+// uint16_t record_counter = 0;
+// bool can_send_enable = true;
+
+// int16_t accel_counter = 0;
+// float dI = 0.1;
+// float sumI = 0;
+
+// extern float accel_current;
+// extern float limit_speed;
+// extern float target_speed;
+// extern float limit_pos;
+// extern int sample_points;
+// extern float brake_current;
+// extern CUSTOM_MODE custom_mode;
+// extern float reset_pos_sample_points;
+// extern float target_duty;
+// extern uint16_t record_counter;
+
+// extern int send_speed_counter;
+// extern int send_pos_counter;
+// extern bool can_send_enable;
+
+typedef enum {
+	SHOOT_DISABLE = 0,
+	SHOOT_READY   = 1,
+	SHOOT_ACCEL   = 2,
+	SHOOT_BREAK   = 3,
+	SHOOT_HOMING  = 4,
+}SHOOT_STATUS;
+
+typedef struct {
+	float accel_current;
+	float target_speed;
+	float brake_current;
+	float home_angle;
+	SHOOT_STATUS SHOOT_STATUS;
+	bool shoot_excute;
+	bool homing_excute;
+	bool auto_homing;
+	int count;
+}Shoot_Parameter_t;
+
+
 // Data types
 typedef enum {
 	HW_TYPE_VESC = 0,
@@ -600,7 +655,8 @@ typedef struct {
 	// Protect from flash corruption.
 	uint16_t crc;
 
-	subarea_PID_t subarea_PID;  //这里新增 可能在读数据的时候出错
+	subarea_PID_t subarea_PID;  //2.19.2024新增 可能在读数据的时候出错 事后补充：事实证明并不会出错！
+	Shoot_Parameter_t shoot_parameter;
 
 } mc_configuration;
 
@@ -1226,6 +1282,12 @@ typedef enum {
 	CAN_PACKET_SET_SUBAREA_PARA3			= 82,
 	CAN_PACKET_STORE_MC_CONFIGURATION		= 83,
 	CAN_PACKET_ENABLE_SUBAREA_PID	        = 84,
+
+	CAN_PACKET_ENABLE_SHOOT	                = 85,  //使能shoot
+	CAN_PACKET_EXCUTE_SHOOT	                = 86,  //执行shoot，开始加速
+	CAN_PACKET_ENABLE_AUTO_HOMING           = 87,  
+	CAN_PACKET_UPDATE_SHOOT_PARAMETER       = 88,  //TODO:把参数更新的CAN_decode加上
+	CAN_PACKET_SHOOT_PARAMETER_RECEIVED     = 89,
 	CAN_PACKET_MAKE_ENUM_32_BITS = 0xFFFFFFFF,
 } CAN_PACKET_ID;
 

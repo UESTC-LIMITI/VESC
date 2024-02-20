@@ -148,8 +148,12 @@ extern volatile float ADC_curr_norm_value[];
 
 /**
  * 自定义函数声明
+ * 
+ * 2.20.2024 有感而发：本杰明老登真乃同步原语仙人也！
  */
 /**************************************************************************************************/
+void mc_interface_custom_pwm_callback (void);
+
 float mc_interface_get_pos_multiturn(void);
 void mc_interface_set_pid_pos_multiturn(float pos);
 bool mc_interface_get_subarea_PID_parameter(uint8_t index, uint8_t* buffer);
@@ -159,6 +163,17 @@ bool mc_interface_set_subarea_PID_parameter3 (uint8_t* buffer);
 bool mc_interface_store_mc_configuration (bool is_motor_2);
 bool mc_interface_subarea_PID_control_enable (uint32_t flag);
 
+volatile Shoot_Parameter_t* mc_interface_get_shoot_parameter (void);
+bool mc_interface_shoot_enable (uint32_t flag);
+bool mc_interface_shoot_excute_enable (uint32_t flag);
+bool mc_interface_set_shoot_home (float home_angle);
+bool mc_interface_set_shoot_accel_current (float acc_cur);
+bool mc_interface_set_shoot_brake_current (float brk_cur);
+bool mc_interface_set_shoot_target_speed (float tar_spd);
+bool mc_interface_shoot_homing (void);
+bool mc_interface_auto_homing_enable (uint32_t flag);
+
+bool mc_interface_shoot_excute (volatile Shoot_Parameter_t* para);  //loop excute
 /**************************************************************************************************/
 
 
