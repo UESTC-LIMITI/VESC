@@ -49,37 +49,8 @@
 
 //以下是shoot
 
-float home_angle = 20;
-float accel_current = 60.0f;
-float limit_speed = 20000.0f;
-float target_speed = 20000.0f;
-float limit_pos = 1500.0f;
-int sample_points = 1;
-float brake_current = 60.0f;
-CUSTOM_MODE custom_mode = CUSTOM_MODE_NONE;
-int reset_pos_sample_points = 5000;
-float reset_speed = 1000;
-int send_speed_counter = 0;
-int send_pos_counter = 0;
-float target_duty = 0.3f;
-//int test_flag = 0;
-extern float home_angle;
-extern float brake_pos;
-extern float brake_speed;
-extern uint8_t finish_flag;
-extern uint8_t state_now;
-extern float max_speed_record;
-extern float max_speed_pos_record;
 
-extern int16_t speed_record[SEND_NUM];
-extern int16_t pos_record[SEND_NUM];
-extern uint16_t record_counter;
-
-extern float dI;
-//extern int test_flag;
-//以上是shoot
-
-bool homing_flag = 0;
+bool homing_flag = false;
 int homing_count = 0;
 
 extern bool homing_flag;
@@ -1259,16 +1230,6 @@ void comm_can_send_status3(uint8_t id, bool replace) {
 void comm_can_send_status4(uint8_t id, bool replace) {
 	int32_t send_index = 0;
 	uint8_t buffer[8];
-	if (send_speed_counter <= record_counter && send_speed_counter < SEND_NUM && finish_flag == 1) {
-		for (int i = 0; i < 4; i++) {
-			if(send_speed_counter < record_counter) {
-				buffer_append_int16(buffer, (int16_t)(speed_record[send_speed_counter++]), &send_index);
-				speed_record[send_speed_counter - 1] = 0;
-			} else {
-				buffer_append_int16(buffer, (int16_t)(0), &send_index);
-			}
-		}
-	}
 	comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_STATUS_4 << 8),
 			buffer, send_index, replace, 0);
 	
@@ -1277,18 +1238,9 @@ void comm_can_send_status4(uint8_t id, bool replace) {
 void comm_can_send_status5(uint8_t id, bool replace) {
 	int32_t send_index = 0;
 	uint8_t buffer[8];
-	if (send_pos_counter <= record_counter && send_pos_counter < SEND_NUM && finish_flag == 1) {
-		for (int i = 0; i < 4; i++) {
-			if(send_pos_counter < record_counter) {
-				buffer_append_int16(buffer, (int16_t)(pos_record[send_pos_counter++]), &send_index);
-				pos_record[send_pos_counter - 1] = 0;
-			} else {
-				buffer_append_int16(buffer, (int16_t)(0), &send_index);
-			}
-		}
 		comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_STATUS_5 << 8),
 			buffer, send_index, replace, 0);
-	}
+	
 }
 
 void comm_can_send_status6(uint8_t id, bool replace) {
@@ -1564,6 +1516,86 @@ bool subarea_PID_parameter_send(uint8_t index) {
 	return true;
 }
 
+/**
+ * @description:          模仿上面的状态发送函数写的, 根据status送shoot参数
+ * @param {shoot_parameter_communication_status_t*} status 发送状态结构体指针
+ * @return {*}            发送了返回处，没发送返回佛斯
+ */
+volatile shoot_parameter_communication_status_t shoot_parameter_communication_status = {0, 0};
+bool shoot_parameter_send(void) {  
+	uint8_t send_buffer[4] = {0};
+	uint8_t id = app_get_configuration()->controller_id;
+	CAN_PACKET_ID packet_id = CAN_PACKET_SHOOT_GET_ACCEL_CURRENT;
+	volatile shoot_parameter_t* para = mc_interface_get_shoot_parameter();
+	volatile shoot_parameter_communication_status_t* status = &shoot_parameter_communication_status;
+	int32_t ind = 0;
+
+	if (status->SEND_STATUS_INDEX == SEND_NONE && status->send_trigger == 0) {
+		return false;
+	}
+
+	switch (status->SEND_STATUS_INDEX) {
+		case SEND_NONE:
+			if (status->send_trigger == true) {
+				status->SEND_STATUS_INDEX = SEND_ACCEL_CURRENT;
+			}
+			break;
+
+		case SEND_ACCEL_CURRENT:
+			if (status->send_trigger == true) {
+				status->send_trigger = false;
+				packet_id = CAN_PACKET_SHOOT_GET_ACCEL_CURRENT;
+				buffer_append_float32(send_buffer, para->accel_current, 1e3, &ind);
+				comm_can_transmit_eid_replace(id | ((uint32_t)packet_id << 8), send_buffer, 4, true, 0);
+				status->SEND_STATUS_INDEX = SEND_BRAKE_CURRENT;
+			}
+			break;
+
+		case SEND_BRAKE_CURRENT:			
+			if (status->send_trigger == true) {
+				status->send_trigger = false;
+				packet_id = CAN_PACKET_SHOOT_GET_BRAKE_CURRENT;
+				buffer_append_float32(send_buffer, para->brake_current, 1e3, &ind);
+				comm_can_transmit_eid_replace(id | ((uint32_t)packet_id << 8), send_buffer, 4, true, 0);
+				status->SEND_STATUS_INDEX = SEND_TARGET_SPEED;
+			}
+			break;
+
+		case SEND_TARGET_SPEED:
+			if (status->send_trigger == true) {
+				status->send_trigger = false;
+				packet_id = CAN_PACKET_SHOOT_GET_TARGET_SPEED;
+				buffer_append_float32(send_buffer, para->target_speed, 1e0, &ind);
+				comm_can_transmit_eid_replace(id | ((uint32_t)packet_id << 8), send_buffer, 4, true, 0);
+				status->SEND_STATUS_INDEX = SEND_HOME_ANGLE;
+			}
+			break;
+
+		case SEND_HOME_ANGLE:
+			if (status->send_trigger == true) {
+				status->send_trigger = false;
+				packet_id = CAN_PACKET_SHOOT_GET_HOME_ANGLE;
+				buffer_append_float32(send_buffer, para->home_angle, 1e3, &ind);
+				comm_can_transmit_eid_replace(id | ((uint32_t)packet_id << 8), send_buffer, 4, true, 0);
+				status->SEND_STATUS_INDEX = SEND_COMPLETE;
+			}
+			break;
+
+		case SEND_COMPLETE:
+			if (status->send_trigger == true) {
+				status->send_trigger = false;
+				status->SEND_STATUS_INDEX = SEND_NONE;
+			}
+			break;
+
+		default:
+			status->SEND_STATUS_INDEX = SEND_NONE;
+			return false;
+			break;
+	}
+	return true;
+}
+
 static THD_FUNCTION(cancom_status_thread, arg) {  //通过can 状态信息发送的线程函数
 	(void)arg;
 	chRegSetThreadName("CAN status 1");
@@ -1581,7 +1613,8 @@ static THD_FUNCTION(cancom_status_thread, arg) {  //通过can 状态信息发送
 			send_subarea_PID_parameter_index == 3    ) {
 				subarea_PID_parameter_send(send_subarea_PID_parameter_index);
 				send_subarea_PID_parameter_index = 0;
-			}
+		}
+		shoot_parameter_send();
 		chThdSleepMilliseconds(1);
 
 		
@@ -1638,6 +1671,7 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 	CAN_PACKET_ID cmd = eid >> 8;
 
 	int id1 = app_get_configuration()->controller_id;
+	volatile shoot_parameter_communication_status_t* status = &shoot_parameter_communication_status;
 
 #ifdef HW_HAS_DUAL_MOTORS
 	int motor_last = mc_interface_get_motor_thread();
@@ -1783,7 +1817,6 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 			break;
 
 		case CAN_PACKET_HOMING:
-			homing_flag = 1;
 			mc_interface_shoot_homing();
 			timeout_reset();
 			break;
@@ -1813,7 +1846,28 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 			ind = 0;
 			timeout_reset();
 			break;
+
+		case CAN_PACKET_UPDATE_SHOOT_PARAMETER:
+			if (status->SEND_STATUS_INDEX == SEND_NONE && status->send_trigger == false) {
+				status->send_trigger = true;
+			}
+			timeout_reset();
+			break;
+				 
+		case CAN_PACKET_SHOOT_PARAMETER_RECEIVED:  //接收到参数之后返回一个应答
+			if (status->send_trigger == false) {
+				status->send_trigger = true;
+			}
+			timeout_reset();
+			break;
 		//以上是shoot部分
+
+		case CAN_PACKET_RELEASE_MOTER:  
+			mc_interface_release_motor();
+			timeout_reset();
+			break;
+
+			
 
 
 
@@ -2183,94 +2237,94 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 	// The packets below are addressed to all devices, mainly containing status information.
 
 	switch (cmd) {
-	case CAN_PACKET_STATUS:
-		for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
-			can_status_msg *stat_tmp = &stat_msgs[i];
-			if (stat_tmp->id == id || stat_tmp->id == -1) {
-				ind = 0;
-				stat_tmp->id = id;
-				stat_tmp->rx_time = chVTGetSystemTimeX();
-				stat_tmp->rpm = (float)buffer_get_int32(data8, &ind);
-				stat_tmp->current = (float)buffer_get_int16(data8, &ind) / 10.0;
-				stat_tmp->duty = (float)buffer_get_int16(data8, &ind) / 1000.0;
-				break;
-			}
-		}
-		break;
+	// case CAN_PACKET_STATUS:
+	// 	for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
+	// 		can_status_msg *stat_tmp = &stat_msgs[i];
+	// 		if (stat_tmp->id == id || stat_tmp->id == -1) {
+	// 			ind = 0;
+	// 			stat_tmp->id = id;
+	// 			stat_tmp->rx_time = chVTGetSystemTimeX();
+	// 			stat_tmp->rpm = (float)buffer_get_int32(data8, &ind);
+	// 			stat_tmp->current = (float)buffer_get_int16(data8, &ind) / 10.0;
+	// 			stat_tmp->duty = (float)buffer_get_int16(data8, &ind) / 1000.0;
+	// 			break;
+	// 		}
+	// 	}
+	// 	break;
 
-	case CAN_PACKET_STATUS_2:
-		for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
-			can_status_msg_2 *stat_tmp_2 = &stat_msgs_2[i];
-			if (stat_tmp_2->id == id || stat_tmp_2->id == -1) {
-				ind = 0;
-				stat_tmp_2->id = id;
-				stat_tmp_2->rx_time = chVTGetSystemTimeX();
-				stat_tmp_2->amp_hours = (float)buffer_get_int32(data8, &ind) / 1e4;
-				stat_tmp_2->amp_hours_charged = (float)buffer_get_int32(data8, &ind) / 1e4;
-				break;
-			}
-		}
-		break;
+	// case CAN_PACKET_STATUS_2:
+	// 	for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
+	// 		can_status_msg_2 *stat_tmp_2 = &stat_msgs_2[i];
+	// 		if (stat_tmp_2->id == id || stat_tmp_2->id == -1) {
+	// 			ind = 0;
+	// 			stat_tmp_2->id = id;
+	// 			stat_tmp_2->rx_time = chVTGetSystemTimeX();
+	// 			stat_tmp_2->amp_hours = (float)buffer_get_int32(data8, &ind) / 1e4;
+	// 			stat_tmp_2->amp_hours_charged = (float)buffer_get_int32(data8, &ind) / 1e4;
+	// 			break;
+	// 		}
+	// 	}
+	// 	break;
 
-	case CAN_PACKET_STATUS_3:
-		for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
-			can_status_msg_3 *stat_tmp_3 = &stat_msgs_3[i];
-			if (stat_tmp_3->id == id || stat_tmp_3->id == -1) {
-				ind = 0;
-				stat_tmp_3->id = id;
-				stat_tmp_3->rx_time = chVTGetSystemTimeX();
-				stat_tmp_3->watt_hours = (float)buffer_get_int32(data8, &ind) / 1e4;
-				stat_tmp_3->watt_hours_charged = (float)buffer_get_int32(data8, &ind) / 1e4;
-				break;
-			}
-		}
-		break;
+	// case CAN_PACKET_STATUS_3:
+	// 	for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
+	// 		can_status_msg_3 *stat_tmp_3 = &stat_msgs_3[i];
+	// 		if (stat_tmp_3->id == id || stat_tmp_3->id == -1) {
+	// 			ind = 0;
+	// 			stat_tmp_3->id = id;
+	// 			stat_tmp_3->rx_time = chVTGetSystemTimeX();
+	// 			stat_tmp_3->watt_hours = (float)buffer_get_int32(data8, &ind) / 1e4;
+	// 			stat_tmp_3->watt_hours_charged = (float)buffer_get_int32(data8, &ind) / 1e4;
+	// 			break;
+	// 		}
+	// 	}
+	// 	break;
 
-	case CAN_PACKET_STATUS_4:
-		for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
-			can_status_msg_4 *stat_tmp_4 = &stat_msgs_4[i];
-			if (stat_tmp_4->id == id || stat_tmp_4->id == -1) {
-				ind = 0;
-				stat_tmp_4->id = id;
-				stat_tmp_4->rx_time = chVTGetSystemTimeX();
-				stat_tmp_4->temp_fet = (float)buffer_get_int16(data8, &ind) / 10.0;
-				stat_tmp_4->temp_motor = (float)buffer_get_int16(data8, &ind) / 10.0;
-				stat_tmp_4->current_in = (float)buffer_get_int16(data8, &ind) / 10.0;
-				stat_tmp_4->pid_pos_now = (float)buffer_get_int16(data8, &ind) / 50.0;
-				break;
-			}
-		}
-		break;
+	// case CAN_PACKET_STATUS_4:
+	// 	for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
+	// 		can_status_msg_4 *stat_tmp_4 = &stat_msgs_4[i];
+	// 		if (stat_tmp_4->id == id || stat_tmp_4->id == -1) {
+	// 			ind = 0;
+	// 			stat_tmp_4->id = id;
+	// 			stat_tmp_4->rx_time = chVTGetSystemTimeX();
+	// 			stat_tmp_4->temp_fet = (float)buffer_get_int16(data8, &ind) / 10.0;
+	// 			stat_tmp_4->temp_motor = (float)buffer_get_int16(data8, &ind) / 10.0;
+	// 			stat_tmp_4->current_in = (float)buffer_get_int16(data8, &ind) / 10.0;
+	// 			stat_tmp_4->pid_pos_now = (float)buffer_get_int16(data8, &ind) / 50.0;
+	// 			break;
+	// 		}
+	// 	}
+	// 	break;
 
-	case CAN_PACKET_STATUS_5:
-		for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
-			can_status_msg_5 *stat_tmp_5 = &stat_msgs_5[i];
-			if (stat_tmp_5->id == id || stat_tmp_5->id == -1) {
-				ind = 0;
-				stat_tmp_5->id = id;
-				stat_tmp_5->rx_time = chVTGetSystemTimeX();
-				stat_tmp_5->tacho_value = buffer_get_int32(data8, &ind);
-				stat_tmp_5->v_in = (float)buffer_get_int16(data8, &ind) / 1e1;
-				break;
-			}
-		}
-		break;
+	// case CAN_PACKET_STATUS_5:
+	// 	for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
+	// 		can_status_msg_5 *stat_tmp_5 = &stat_msgs_5[i];
+	// 		if (stat_tmp_5->id == id || stat_tmp_5->id == -1) {
+	// 			ind = 0;
+	// 			stat_tmp_5->id = id;
+	// 			stat_tmp_5->rx_time = chVTGetSystemTimeX();
+	// 			stat_tmp_5->tacho_value = buffer_get_int32(data8, &ind);
+	// 			stat_tmp_5->v_in = (float)buffer_get_int16(data8, &ind) / 1e1;
+	// 			break;
+	// 		}
+	// 	}
+	// 	break;
 
-	case CAN_PACKET_STATUS_6:
-		for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
-			can_status_msg_6 *stat_tmp_6 = &stat_msgs_6[i];
-			if (stat_tmp_6->id == id || stat_tmp_6->id == -1) {
-				ind = 0;
-				stat_tmp_6->id = id;
-				stat_tmp_6->rx_time = chVTGetSystemTimeX();
-				stat_tmp_6->adc_1 = buffer_get_float16(data8, 1e3, &ind);
-				stat_tmp_6->adc_2 = buffer_get_float16(data8, 1e3, &ind);
-				stat_tmp_6->adc_3 = buffer_get_float16(data8, 1e3, &ind);
-				stat_tmp_6->ppm = buffer_get_float16(data8, 1e3, &ind);
-				break;
-			}
-		}
-		break;
+	// case CAN_PACKET_STATUS_6:
+	// 	for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
+	// 		can_status_msg_6 *stat_tmp_6 = &stat_msgs_6[i];
+	// 		if (stat_tmp_6->id == id || stat_tmp_6->id == -1) {
+	// 			ind = 0;
+	// 			stat_tmp_6->id = id;
+	// 			stat_tmp_6->rx_time = chVTGetSystemTimeX();
+	// 			stat_tmp_6->adc_1 = buffer_get_float16(data8, 1e3, &ind);
+	// 			stat_tmp_6->adc_2 = buffer_get_float16(data8, 1e3, &ind);
+	// 			stat_tmp_6->adc_3 = buffer_get_float16(data8, 1e3, &ind);
+	// 			stat_tmp_6->ppm = buffer_get_float16(data8, 1e3, &ind);
+	// 			break;
+	// 		}
+	// 	}
+	// 	break;
 
 	case CAN_PACKET_IO_BOARD_ADC_1_TO_4:
 		for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {

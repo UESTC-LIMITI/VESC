@@ -99,6 +99,7 @@ void comm_can_send_status6(uint8_t id, bool replace);
  * 在comm_can里自定义的函数
  *****************************************************************************************/
 bool subarea_PID_parameter_send(uint8_t index); //和状态发射函数是一个性质的，都在线程里跑
+bool shoot_parameter_send(void);
 
 //#define CUSTOM_STATUS  //自定义回传状态
 

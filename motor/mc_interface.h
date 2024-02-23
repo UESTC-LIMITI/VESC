@@ -23,6 +23,9 @@
 #include "conf_general.h"
 #include "hw.h"
 #include "datatypes.h"
+#include "timeout.h"
+#include "timer.h"
+
 
 // Functions
 void mc_interface_init(void);
@@ -163,7 +166,7 @@ bool mc_interface_set_subarea_PID_parameter3 (uint8_t* buffer);
 bool mc_interface_store_mc_configuration (bool is_motor_2);
 bool mc_interface_subarea_PID_control_enable (uint32_t flag);
 
-volatile Shoot_Parameter_t* mc_interface_get_shoot_parameter (void);
+volatile shoot_parameter_t* mc_interface_get_shoot_parameter (void);
 bool mc_interface_shoot_enable (uint32_t flag);
 bool mc_interface_shoot_excute_enable (uint32_t flag);
 bool mc_interface_set_shoot_home (float home_angle);
@@ -173,7 +176,7 @@ bool mc_interface_set_shoot_target_speed (float tar_spd);
 bool mc_interface_shoot_homing (void);
 bool mc_interface_auto_homing_enable (uint32_t flag);
 
-bool mc_interface_shoot_excute (volatile Shoot_Parameter_t* para);  //loop excute
+bool mc_interface_shoot_excute (void);  //loop excute
 /**************************************************************************************************/
 
 

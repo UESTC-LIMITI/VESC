@@ -22,6 +22,7 @@
 
 #include "C:\Users\MikanseiP\Desktop\VESC_Code\datatypes.h"
 #include "mc_interface.h"
+#include "timer.h"
 
 // Types
 typedef struct {

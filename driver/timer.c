@@ -31,7 +31,7 @@ void timer_init(void) {
 
 	TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
 	TIM_TimeBaseStructure.TIM_Period = 0xFFFFFFFF;
-	TIM_TimeBaseStructure.TIM_Prescaler = PrescalerValue;
+	TIM_TimeBaseStructure.TIM_Prescaler = PrescalerValue;  //5
 	TIM_TimeBaseStructure.TIM_ClockDivision = 0;
 	TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
 	TIM_TimeBaseInit(TIM5, &TIM_TimeBaseStructure);
@@ -44,7 +44,7 @@ uint32_t timer_time_now(void) {
 	return TIM5->CNT;
 }
 
-float timer_seconds_elapsed_since(uint32_t time) {  //一般计时用timer5
+float timer_seconds_elapsed_since(uint32_t time) {  //一般计时用timer5 300多秒才重置一次
 	uint32_t diff = TIM5->CNT - time;
 	return (float)diff / (float)TIMER_HZ;
 }
@@ -55,7 +55,7 @@ float timer_seconds_elapsed_since(uint32_t time) {  //一般计时用timer5
  * @param seconds
  * Seconds to sleep.
  */
-void timer_sleep(float seconds) {
+void timer_sleep(float seconds) {            //基于TIM5的阻塞式sleep
 	uint32_t start_t = TIM5->CNT;
 
 	for (;;) {

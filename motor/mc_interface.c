@@ -223,7 +223,7 @@ void mc_interface_init(void) {   //上位机与下位机交互的init？
 
 	encoder_init(&motor_now()->m_conf);
 
-	mc_interface_set_pwm_callback(mc_interface_custom_pwm_callback);  //设置自定义pwm回调函数
+//	mc_interface_set_pwm_callback(mc_interface_custom_pwm_callback);  //设置自定义pwm回调函数
 
 	// Initialize selected implementation
 	switch (motor_now()->m_conf.motor_type) {
@@ -3194,29 +3194,17 @@ bool mc_interface_subarea_PID_control_enable (uint32_t flag) {
  * 设置好的发射参数可以存在flash里，下次自动读取
  * TODO：
  * 1. 写完CAN接收解码->置位->高速轮询流程检测到标志位变化，自动执行一整套状态机->检测到结束条件，置结束位->等待下一流程的启动置位 done
- * 2. 在库中添加相关CAN通信函数，能够通过CAN控制发射、改变参数
- * 3. 测试
+ * 2. 在库中添加相关CAN通信函数，能够通过CAN控制发射、改变参数 done
+ * 3. 测试 done
  * 4. 在流程中加一些稳定性判断条件，比如检测到加速时间过长就刹车
  * 5. 能把参数存进flash和读出来到单片机
  */
-volatile Shoot_Parameter_t* mc_interface_get_shoot_parameter (void) {
+volatile shoot_parameter_t* mc_interface_get_shoot_parameter (void) {
 	return &(m_motor_1.m_conf.shoot_parameter);
 }
 
-bool mc_interface_set_shoot_home (float home_angle) {
-	volatile Shoot_Parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);
-	para->home_angle = home_angle;
-	return true;
-}
-
-bool mc_interface_shoot_homing (void) {
-	volatile Shoot_Parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);
-	para->homing_excute = true;
-	return true;
-}
-
 bool mc_interface_shoot_enable (uint32_t flag) {
-	volatile Shoot_Parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);
+	volatile shoot_parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);
 	if (flag > 0) {
 		para->SHOOT_STATUS = SHOOT_READY;
 	} else {
@@ -3225,18 +3213,8 @@ bool mc_interface_shoot_enable (uint32_t flag) {
 	return true;
 }
 
-bool mc_interface_shoot_excute_enable (uint32_t flag) {
-	volatile Shoot_Parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);
-	if (flag > 0) {
-		para->shoot_excute = true;
-	} else {
-		para->shoot_excute = false;
-	}
-	return true;
-}
-
 bool mc_interface_auto_homing_enable (uint32_t flag) {
-	volatile Shoot_Parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);
+	volatile shoot_parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);
 	if (flag > 0) {
 		para->auto_homing = true;
 	} else {
@@ -3245,87 +3223,162 @@ bool mc_interface_auto_homing_enable (uint32_t flag) {
 	return true;
 }
 
-extern bool homing_flag;
-extern int homing_count;
-
-bool mc_interface_shoot_excute (volatile Shoot_Parameter_t* para) {
-	if (para->SHOOT_STATUS == SHOOT_DISABLE) {
-		return false;
-	}
-	switch (para->SHOOT_STATUS) {
-	case SHOOT_READY:
-		if (para->shoot_excute == true) {
-			para->shoot_excute = false;
-			para->SHOOT_STATUS = SHOOT_ACCEL;
-		}
-		break;
-	
-	case SHOOT_ACCEL:
-		mc_interface_set_current(para->accel_current);
-		if (mc_interface_get_rpm() >= para->target_speed) {
-			mc_interface_set_brake_current(para->brake_current);
-			para->SHOOT_STATUS = SHOOT_BREAK;
-		}
-		break;
-	
-	case SHOOT_BREAK:
-		mc_interface_set_brake_current(para->brake_current);
-		if (mc_interface_get_rpm() < 20) {
-			para->count++;
-		} else { para->count = 0; }
-		if (para->count > 10000) {
-			para->count = 10000;
-			if (para->auto_homing == true) {
-				mc_interface_shoot_homing();
-				para->count = 0;
-				para->SHOOT_STATUS = SHOOT_HOMING;
-			} else if (para->homing_excute == true) {
-				mc_interface_shoot_homing();
-				para->count = 0;
-				para->SHOOT_STATUS = SHOOT_HOMING;
-			}
-		}
-		break;
-	
-	case SHOOT_HOMING:
-		mc_interface_shoot_homing();
-		float error_abs = fabsf(mc_interface_get_pos_multiturn() - (para->home_angle));
-		if (error_abs < 1) {
-			para->count++;
-		} else { para->count = 0; }
-		if (para->count > 10000 && homing_flag == false) {
-			para->count = 0;
-			para->SHOOT_STATUS = SHOOT_READY;
-			para->shoot_excute = false;
-		}
-		break;
-
-	default:
-		break;
-	}
-	return true;
-}
-
 bool mc_interface_set_shoot_accel_current (float acc_cur) {
-	volatile Shoot_Parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);	
+	volatile shoot_parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);	
 	para->accel_current = acc_cur;
 	return true;
 }
 
 bool mc_interface_set_shoot_brake_current (float brk_cur) {
-	volatile Shoot_Parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);	
+	volatile shoot_parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);	
 	para->brake_current = brk_cur;
 	return true;
 }
 
 bool mc_interface_set_shoot_target_speed (float tar_spd) {
-	volatile Shoot_Parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);	
+	volatile shoot_parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);	
 	para->target_speed = tar_spd;
 	return true;
 }
 
+bool mc_interface_set_shoot_home (float home_angle) {
+	volatile shoot_parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);
+	para->home_angle = home_angle;
+	return true;
+}
+
+bool mc_interface_shoot_excute_enable (uint32_t flag) {
+	volatile shoot_parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);
+	if (para->SHOOT_STATUS != SHOOT_READY) {  //不ready就不触发
+		return false;
+	}
+	if (flag > 0) {
+		para->shoot_excute = true;
+	} else {
+		para->shoot_excute = false;
+	}
+	return true;
+}
+
+extern bool homing_flag;
+extern int homing_count;
+
+bool mc_interface_shoot_homing (void) {
+	volatile shoot_parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);
+	homing_flag = 1;
+	para->homing_excute = true;
+	return true;
+}
+
+bool mc_interface_shoot_excute (void) {
+	volatile shoot_parameter_t* para = &(m_motor_1.m_conf.shoot_parameter);
+	if (para->SHOOT_STATUS == SHOOT_DISABLE) {
+		para->accel_time_elaspe = 0;
+		para->brake_time_elaspe= 0;
+		para->homing_time_elaspe = 0;
+		para->homing_stable_time_elaspe = 0;
+		return false;
+	}
+	switch (para->SHOOT_STATUS) {
+	case SHOOT_READY:
+		if (homing_flag == true) {
+			homing_flag = false;
+		}
+		mc_interface_release_motor();
+		if (para->shoot_excute == true) {
+			para->shoot_excute = false;
+			para->SHOOT_STATUS = SHOOT_ACCEL;
+			para->accel_time_start = timer_time_now();
+		}
+		timeout_reset();
+		break;
+	
+	case SHOOT_ACCEL:
+		para->accel_time_elaspe = timer_seconds_elapsed_since(para->accel_time_start);
+		if (para->accel_time_elaspe > 100.0f) { //遇到计时器跳变这种小概率事件，重置计时
+			para->accel_time_start = timer_time_now();
+		}
+		else if (para->accel_time_elaspe > 2.0f) {
+			para->SHOOT_STATUS = SHOOT_DISABLE;
+			mc_interface_release_motor();
+			para->accel_time_elaspe = 0.0f;
+			return false;
+		}
+		mc_interface_set_current(para->accel_current);
+		if (mc_interface_get_rpm() >= para->target_speed) {
+			mc_interface_set_brake_current(para->brake_current);
+			para->SHOOT_STATUS = SHOOT_BREAK;
+			para->accel_time_elaspe = 0.0f;
+			para->brake_time_start = timer_time_now();
+		}
+		timeout_reset();
+		break;
+	
+	case SHOOT_BREAK:
+		para->brake_time_elaspe = timer_seconds_elapsed_since(para->brake_time_start);
+		if (para->brake_time_elaspe > 100.0f) { //遇到计时器跳变这种小概率事件，重置计时
+			para->brake_time_start = timer_time_now();
+		}
+		mc_interface_set_brake_current(para->brake_current);
+		if (para->brake_time_elaspe > 20.0f) {
+			para->SHOOT_STATUS = SHOOT_DISABLE;
+			mc_interface_release_motor();
+			para->brake_time_elaspe = 0.0f;
+			return false;
+		}
+		if (mc_interface_get_rpm() < 100.0f && para->brake_time_elaspe > 2.0f ) {
+			if (para->auto_homing == true) {
+				homing_flag = true;
+				para->SHOOT_STATUS = SHOOT_HOMING;
+				para->brake_time_elaspe = 0.0f;
+				para->homing_time_start = timer_time_now();
+			} else if (para->homing_excute == true) {
+				homing_flag = true;
+				para->SHOOT_STATUS = SHOOT_HOMING;
+				para->brake_time_elaspe = 0.0f;
+				para->homing_time_start = timer_time_now();
+			}
+		}
+		timeout_reset();
+		break;
+	
+	case SHOOT_HOMING:
+		para->homing_time_elaspe = timer_seconds_elapsed_since(para->homing_time_start);
+		if (para->homing_time_elaspe > 100.0f) { //遇到计时器跳变这种小概率事件，重置计时
+			para->homing_time_start = timer_time_now();
+		}
+		else if (para->homing_time_elaspe > 10.0f) {
+			para->SHOOT_STATUS = SHOOT_DISABLE;
+			mc_interface_release_motor();
+			para->homing_time_elaspe = 0.0f;
+			return false;
+			homing_flag = false;
+		}
+		mc_interface_set_pid_pos_multiturn(para->home_angle);
+		float error_abs = fabsf(mc_interface_get_pos_multiturn() - (para->home_angle));
+		if (error_abs > 5) {  //不在死区内 更新稳定计时
+			para->homing_stable_time_elaspe = timer_seconds_elapsed_since(para->homing_time_start);
+		}
+		if (para->homing_time_elaspe - para->homing_stable_time_elaspe > 2.0f) {
+			para->SHOOT_STATUS = SHOOT_READY;
+			para->homing_excute = false;
+			para->shoot_excute = false;
+			para->homing_time_elaspe = 0.0f;
+			para->homing_stable_time_elaspe = 0.0f;
+			homing_flag = false;
+		}
+		timeout_reset();
+		break;
+
+	default:
+		timeout_reset();
+		break;
+	}
+	return true;
+}
+
 void mc_interface_custom_pwm_callback (void) {
-	mc_interface_shoot_excute(&(m_motor_1.m_conf.shoot_parameter));
+	mc_interface_shoot_excute();
 	//可以自定义一些逻辑
 }
 

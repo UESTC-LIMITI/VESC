@@ -2,7 +2,7 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-28 09:12:06
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2024-02-20 10:41:39
+ * @LastEditTime: 2024-02-21 14:03:00
  * @FilePath: \VESC_Code\VESC对接的库\新的 适配新固件\VESC_CAN.c
  * @Description: 
  * VESC_CAN 1.0 曹总写的库 回传有问题，发送和设置模式分开 10.28.2021
@@ -21,34 +21,7 @@
 
 motor_info_t motor_info[8] = {0};  //VESC回传数据储存在这里
 subarea_PID_parameter_t subarea_PID_parameter = {0};
-Shoot_Parameter_t shoot_parameter = {0};
-
-/**
- * @description:                    初始化从VESC获取参数
- * @param {uint8_t} id              VESC id
- * @param {CAN_HandleTypeDef} *hcan 目标CAN
- * @return {*}
- */
-bool VESC_ParamterRead(uint8_t id, CAN_HandleTypeDef *hcan) {
-//	subarea_PID_parameter_t* para = &subarea_PID_parameter;
-	subarea_PID_parameter_communication_t* para_com_status = &(subarea_PID_parameter.com_status);
-	para_com_status->para1_received = false;
-	para_com_status->para2_received = false;
-	para_com_status->para3_received = false;
-	while (para_com_status->para1_received == false) {
-		VESC_GetSubareaPIDPara1Request(id, hcan);
-		HAL_Delay(50);
-	}
-	while (para_com_status->para2_received == false) {
-		VESC_GetSubareaPIDPara2Request(id, hcan);
-		HAL_Delay(50);
-	}
-	while (para_com_status->para3_received == false) {
-		VESC_GetSubareaPIDPara3Request(id, hcan);
-		HAL_Delay(50);
-	}
-	return true;
-}
+shoot_parameter_t shoot_parameter = {0};
 
 /**
  * @description:                    CAN发送函数
@@ -182,6 +155,33 @@ bool VESC_SetMultiturnPos(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
 }
 
 /******************************************分区PID控制部分函数开始*******************************************/
+/**
+ * @description:                    初始化从VESC获取参数
+ * @param {uint8_t} id              VESC id
+ * @param {CAN_HandleTypeDef} *hcan 目标CAN
+ * @return {*}
+ */
+bool VESC_PIDParameterRead(uint8_t id, CAN_HandleTypeDef *hcan) {
+//	subarea_PID_parameter_t* para = &subarea_PID_parameter;
+	subarea_PID_parameter_communication_t* para_com_status = &(subarea_PID_parameter.com_status);
+	para_com_status->para1_received = false;
+	para_com_status->para2_received = false;
+	para_com_status->para3_received = false;
+	while (para_com_status->para1_received == false) {
+		VESC_GetSubareaPIDPara1Request(id, hcan);
+		HAL_Delay(50);
+	}
+	while (para_com_status->para2_received == false) {
+		VESC_GetSubareaPIDPara2Request(id, hcan);
+		HAL_Delay(50);
+	}
+	while (para_com_status->para3_received == false) {
+		VESC_GetSubareaPIDPara3Request(id, hcan);
+		HAL_Delay(50);
+	}
+	return true;
+}
+
 /**
  * @description:                          设置分区PID控制参数 1组 2组 3组
  * @param {subarea_PID_parameter_t} *para 储存参数的指针
@@ -389,14 +389,21 @@ int32_t uchar2int32(uint8_t* buffer, int32_t *index) {
 
 /*********************************shoot相关开始****************************************/
 bool SHOOT_ParameterInit (void) {
-	Shoot_Parameter_t* para = &shoot_parameter;
-	para->accel_current = 40;
-	para->brake_current = 80;
-	para->target_speed = 10000;
-	para->home_angle = 20;
+	if(SHOOT_VESC_ID > 255 || SHOOT_VESC_ID <= 0) {
+		VESC_Error_Handler(Set_id_Wrong);
+	}
+	shoot_parameter_t* para = &shoot_parameter;
+	para->com_status.init_done = false;
+	SHOOT_UpdateParameter();
+	while (para->com_status.home_angle_received == false);
+	while (para->com_status.target_speed_received == false);
+	while (para->com_status.brake_current_received == false);
+	while (para->com_status.accel_current_received == false);		
 	para->auto_homing = false;
 	para->homing_excute = false;
 	para->shoot_excute = false;
+	para->com_status.init_done = true;
+	return true;
 }
 
 bool SHOOT_EnableShoot (uint32_t flag) {
@@ -404,7 +411,7 @@ bool SHOOT_EnableShoot (uint32_t flag) {
 	uint32_t eid = (SHOOT_VESC_ID & 0xff) | ((uint32_t)CAN_PACKET_ENABLE_SHOOT << 8);
 	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
 	buffer_append_uint32(VESC_Send_Buffer, flag, &ind);
-	VESC_CAN_SendData(hcan, id, eid, 4);
+	VESC_CAN_SendData(&SHOOT_VESC_HCAN, SHOOT_VESC_ID, eid, 4);
 	return true;
 }
 
@@ -413,7 +420,7 @@ bool SHOOT_EnableAutoHoming (uint32_t flag) {
 	uint32_t eid = (SHOOT_VESC_ID & 0xff) | ((uint32_t)CAN_PACKET_ENABLE_AUTO_HOMING << 8);
 	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
 	buffer_append_uint32(VESC_Send_Buffer, flag, &ind);
-	VESC_CAN_SendData(hcan, id, eid, 4);
+	VESC_CAN_SendData(&SHOOT_VESC_HCAN, SHOOT_VESC_ID, eid, 4);
 	return true;
 }
 
@@ -423,7 +430,7 @@ bool SHOOT_SetAccelCurrent (float acc_cur) {
 	uint32_t eid = (SHOOT_VESC_ID & 0xff) | ((uint32_t)CAN_PACKET_SET_ACCEL_CURRENT << 8);
 	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
 	buffer_append_float32(VESC_Send_Buffer, acc_cur, CURRENT_SCALE, &ind);
-	VESC_CAN_SendData(hcan, id, eid, 4);
+	VESC_CAN_SendData(&SHOOT_VESC_HCAN, SHOOT_VESC_ID, eid, 4);
 	return true;
 }
 
@@ -433,7 +440,7 @@ bool SHOOT_SetBrakeCurrent (float brk_cur) {
 	uint32_t eid = (SHOOT_VESC_ID & 0xff) | ((uint32_t)CAN_PACKET_SET_BRAKE_CURRENT << 8);
 	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
 	buffer_append_float32(VESC_Send_Buffer, brk_cur, CURRENT_SCALE, &ind);
-	VESC_CAN_SendData(hcan, id, eid, 4);
+	VESC_CAN_SendData(&SHOOT_VESC_HCAN, SHOOT_VESC_ID, eid, 4);
 	return true;
 }
 
@@ -443,15 +450,14 @@ bool SHOOT_SetTargetSpeed (float tar_spd) {
 	uint32_t eid = (SHOOT_VESC_ID & 0xff) | ((uint32_t)CAN_PACKET_SET_TARGET_SPEED << 8);
 	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
 	buffer_append_float32(VESC_Send_Buffer, tar_spd, RPM_SCALE, &ind);
-	VESC_CAN_SendData(hcan, id, eid, 4);
+	VESC_CAN_SendData(&SHOOT_VESC_HCAN, SHOOT_VESC_ID, eid, 4);
 	return true;
 }
 
 bool SHOOT_SetHome (void) {
-	int32_t ind = 0;
 	uint32_t eid = (SHOOT_VESC_ID & 0xff) | ((uint32_t)CAN_PACKET_SET_HOME << 8);
 	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
-	VESC_CAN_SendData(hcan, id, eid, 4);
+	VESC_CAN_SendData(&SHOOT_VESC_HCAN, SHOOT_VESC_ID, eid, 4);
 	return true;
 }
 
@@ -460,15 +466,33 @@ bool SHOOT_ExcuteShoot (uint32_t flag) {  //加一个flag保险起见
 	uint32_t eid = (SHOOT_VESC_ID & 0xff) | ((uint32_t)CAN_PACKET_EXCUTE_SHOOT << 8);
 	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
 	buffer_append_uint32(VESC_Send_Buffer, flag, &ind);
-	VESC_CAN_SendData(hcan, id, eid, 4);
+	VESC_CAN_SendData(&SHOOT_VESC_HCAN, SHOOT_VESC_ID, eid, 4);
 	return true;
 }
 
 bool SHOOT_ExcuteHoming (void) {
-	int32_t ind = 0;
 	uint32_t eid = (SHOOT_VESC_ID & 0xff) | ((uint32_t)CAN_PACKET_HOMING << 8);
 	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
-	VESC_CAN_SendData(hcan, id, eid, 4);
+	VESC_CAN_SendData(&SHOOT_VESC_HCAN, SHOOT_VESC_ID, eid, 4);
+	return true;
+}
+
+bool SHOOT_UpdateParameter (void) {
+	uint32_t eid = (SHOOT_VESC_ID & 0xff) | ((uint32_t)CAN_PACKET_UPDATE_SHOOT_PARAMETER << 8);
+	shoot_parameter_t* shoot_para = &shoot_parameter;
+	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
+	shoot_para->com_status.accel_current_received = 0;
+	shoot_para->com_status.brake_current_received = 0;
+	shoot_para->com_status.target_speed_received = 0;
+	shoot_para->com_status.home_angle_received = 0;
+	VESC_CAN_SendData(&SHOOT_VESC_HCAN, SHOOT_VESC_ID, eid, 4);
+	return true;
+}
+
+bool SHOOT_ParamterReceivedAcknowledge (void) {
+	uint32_t eid = (SHOOT_VESC_ID & 0xff) | ((uint32_t)CAN_PACKET_SHOOT_PARAMETER_RECEIVED << 8);
+	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
+	VESC_CAN_SendData(&SHOOT_VESC_HCAN, SHOOT_VESC_ID, eid, 4);
 	return true;
 }
 
@@ -487,7 +511,8 @@ bool VESC_CAN_decode (uint32_t ExtID, uint8_t *pData) {
 	int32_t index = 0;
 	bool ret = false;
 	
-	subarea_PID_parameter_t* para = &subarea_PID_parameter;
+	subarea_PID_parameter_t* PID_para = &subarea_PID_parameter;
+	shoot_parameter_t* shoot_para = &shoot_parameter;
 
 #if defined(FLOAT_TRANSMITTED)
 	switch (packet_id) {
@@ -517,18 +542,21 @@ bool VESC_CAN_decode (uint32_t ExtID, uint8_t *pData) {
 #else
 	switch (packet_id) {
 		case (uint32_t)CAN_PACKET_STATUS:
+			index = 0;
 			motor_info[id-1].rpm = (uchar2int32(pData, &index) / RPM_SCALE);
 			motor_info[id-1].duty_cycle = (uchar2int32(pData, &index) / DUTY_CYCLE_SCALE);
 			ret = true;
 			break;
 
 		case (uint32_t)CAN_PACKET_STATUS_2:
+			index = 0;
 			motor_info[id-1].pos = (uchar2int32(pData, &index) / POS_SCALE);
 			motor_info[id-1].mul_pos = (uchar2int32(pData, &index) / MULTITURN_POS_SCALE);
 			ret = true;
 			break;
 		
 		case (uint32_t)CAN_PACKET_STATUS_3:
+			index = 0;
 			motor_info[id-1].tot_current_in = (uchar2int32(pData, &index) / CURRENT_SCALE);
 			motor_info[id-1].tot_voltage = (uchar2int32(pData, &index) / VOLTAGE_SCALE);
 			motor_info[id-1].power = motor_info[id-1].tot_current_in * motor_info[id-1].tot_voltage;
@@ -536,25 +564,58 @@ bool VESC_CAN_decode (uint32_t ExtID, uint8_t *pData) {
 			break;
 
 		case (uint32_t)CAN_PACKET_STATUS_4:
+			index = 0;
 			//目前 do nothing			
 			ret = true;
 			break;
 
 		case (uint32_t)CAN_PACKET_GET_SUBAREA_PARA1:
-			VESC_GetSubareaPIDPara1(para, pData);
-			para->com_status.para1_received = true;
+			index = 0;
+			VESC_GetSubareaPIDPara1(PIDpara, pData);
+			PIDpara->com_status.para1_received = true;
 			ret = true;
 			break;
 
 		case (uint32_t)CAN_PACKET_GET_SUBAREA_PARA2:
-			VESC_GetSubareaPIDPara2(para, pData);
-			para->com_status.para2_received = true;
+			index = 0;
+			VESC_GetSubareaPIDPara2(PIDpara, pData);
+			PIDpara->com_status.para2_received = true;
 			ret = true;
 			break;
 
 		case (uint32_t)CAN_PACKET_GET_SUBAREA_PARA3:
-			VESC_GetSubareaPIDPara3(para, pData);
-			para->com_status.para3_received = true;
+			index = 0;
+			VESC_GetSubareaPIDPara3(PIDpara, pData);
+			PIDpara->com_status.para3_received = true;
+			ret = true;
+			break;
+		
+		//以下是shoot部分
+		case (uint32_t)CAN_PACKET_SHOOT_GET_ACCEL_CURRENT:
+			index = 0;
+			shoot_para->accel_current = buffer_get_float32(pData, CURRENT_SCALE, &index);
+			shoot_para->com_status.accel_current_received = true;
+			ret = true;
+			break;
+
+		case (uint32_t)CAN_PACKET_SHOOT_GET_BRAKE_CURRENT:
+			index = 0;
+			shoot_para->brake_current = buffer_get_float32(pData, CURRENT_SCALE, &index);
+			shoot_para->com_status.brake_current_received = true;
+			ret = true;
+			break;
+
+		case (uint32_t)CAN_PACKET_SHOOT_GET_TARGET_SPEED:
+			index = 0;
+			shoot_para->target_speed = buffer_get_float32(pData, RPM_SCALE, &index);
+			shoot_para->com_status.target_speed_received = true;
+			ret = true;
+			break;
+
+		case (uint32_t)CAN_PACKET_SHOOT_GET_HOME_ANGLE:
+			index = 0;
+			shoot_para->home_angle = buffer_get_float32(pData, CURRENT_SCALE, &index);
+			shoot_para->com_status.home_angle_received = true;
 			ret = true;
 			break;
 
@@ -568,9 +629,9 @@ bool VESC_CAN_decode (uint32_t ExtID, uint8_t *pData) {
 
 /**
  * @description:                   出错啦
- * @param {VESC_ErrorCode_t} Code  错误码
+ * @param {VESC_error_code_t} Code  错误码
  */
-static void VESC_Error_Handler(VESC_ErrorCode_t Code) {
+static void VESC_Error_Handler(VESC_error_code_t Code) {
 	//call stack 里看 ErrorCode
 	Error_Handler();
 }

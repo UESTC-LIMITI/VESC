@@ -24,6 +24,7 @@
 extern bool homing_flag;
 extern int homing_count;
 
+#define PTZ_USED
 
 #define POS_PID_DEADBAND 1.5
 #define POS_PID_DEADBAND_GAIN 3
@@ -348,6 +349,10 @@ void foc_run_pid_control_pos(bool index_found, float dt, motor_all_state_t *moto
 	mc_configuration *conf_now = motor->m_conf;
 	volatile subarea_PID_t *subarea_PID = &(conf_now->subarea_PID);
 
+	static float angle_set_last;
+	static bool angle_changed;
+	static uint32_t  set_angle_changed_start;
+
 	float angle_now = motor->m_pos_pid_now;
 	float angle_set = motor->m_pos_pid_set;
 
@@ -459,6 +464,38 @@ void foc_run_pid_control_pos(bool index_found, float dt, motor_all_state_t *moto
 	// Calculate output
 	float output = p_term + motor->m_pos_i_term + d_term + d_term_proc;
 	utils_truncate_number(&output, -1.0, 1.0);
+
+	if (error_abs > 20) {
+		utils_truncate_number(&output, -0.15f, 0.15f);
+	}
+	if (error_abs > 15) {
+		utils_truncate_number(&output, -0.2f, 0.2f);
+	}
+	else if (error_abs > 8) {
+		utils_truncate_number(&output, -0.3f, 0.3f);
+	}
+	else if (error_abs > 4) {
+		utils_truncate_number(&output, -0.4f, 0.4f);
+	}
+	else if (error_abs > 4.5) {
+		utils_truncate_number(&output, -0.55f, 0.55f);
+	}
+	else if (error_abs > 4) {
+		utils_truncate_number(&output, -0.8f, 0.8f);
+	}
+	else if (error_abs > 2) {
+		utils_truncate_number(&output, -1.0f, 1.0f);
+	}
+	if (angle_set_last != angle_set) {
+		set_angle_changed_start = timer_time_now();
+		angle_changed = true;
+	}
+	if (timer_seconds_elapsed_since(set_angle_changed_start) < 0.5 && angle_changed == true) {
+		utils_truncate_number(&output, -0.2f, 0.2f);  //给的角度稳定了再把限幅搞大
+	} else {
+		angle_changed = false;
+	}
+	angle_set_last = angle_set;
 
 	if (conf_now->m_sensor_port_mode != SENSOR_PORT_MODE_HALL) {
 		if (index_found) {
@@ -601,22 +638,34 @@ void foc_run_pid_control_pos_multiturn(bool index_found, float dt, motor_all_sta
 
 	// Calculate output
 	float output = p_term + motor->m_pos_i_term + d_term + d_term_proc;
-
+	static uint32_t time_autohoming_start;
+	static float time_autohoming_elaspe;
+	static float time_autohoming_stable_time;
+	static bool started;
     //以下这些是shoot关于自动归位的内容
 	if (homing_flag) {
-		if (error_abs > 5) {
-			utils_truncate_number(&output, -0.06, 0.06);
+		if (started == false) {
+			time_autohoming_start = timer_time_now();
+			started = true;
+		}
+
+		time_autohoming_elaspe = timer_seconds_elapsed_since(time_autohoming_start);
+
+		if (error_abs > 2) {
+			utils_truncate_number(&output, -0.02, 0.02);
 		} else {
 			utils_truncate_number(&output, -0.5, 0.5);
 		}
-		if (error_abs < 1) {
-			homing_count ++;
-			if (homing_count > 10000) {
-				homing_count = 0;
-				homing_flag = 0;
+		if (error_abs < 2) {
+			if (time_autohoming_elaspe - time_autohoming_stable_time > 1.0f) {
+				homing_flag = false;
+				started = false;
+				time_autohoming_start = 0;
+				time_autohoming_elaspe = 0;
+				time_autohoming_stable_time = 0;
 			}
 		} else {
-			homing_count = 0;
+			time_autohoming_stable_time = timer_seconds_elapsed_since(time_autohoming_start);
 		}
 	}
 	utils_truncate_number(&output, -0.6, 0.6);   //虽然Kp输出不限幅但是最后会限幅

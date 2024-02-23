@@ -245,7 +245,7 @@ static THD_FUNCTION(timeout_thread, arg) {
 
 #if CAN_ENABLE
 		if(feed_counter[THREAD_CANBUS] < MIN_THREAD_ITERATIONS) {
-			threads_ok = false;
+			 threads_ok = false;
 		}
 #endif
 

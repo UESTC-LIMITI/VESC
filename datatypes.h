@@ -28,18 +28,7 @@
 //#define USE_CUSTOM_ENCODER1
 
 
-#define SEND_NUM 20
 
-typedef enum {
-	CUSTOM_MODE_NONE = 0,
-	CUSTOM_MODE_1,
-	CUSTOM_MODE_2,
-	CUSTOM_MODE_3,
-	CUSTOM_MODE_4,
-	CUSTOM_MODE_5,
-	CUSTOM_MODE_6,
-	CUSTOM_MODE_7,
-} CUSTOM_MODE;
 
 typedef struct  {
 	float subarea_1;
@@ -100,7 +89,7 @@ typedef enum {
 	SHOOT_ACCEL   = 2,
 	SHOOT_BREAK   = 3,
 	SHOOT_HOMING  = 4,
-}SHOOT_STATUS;
+} SHOOT_STATUS;
 
 typedef struct {
 	float accel_current;
@@ -111,9 +100,29 @@ typedef struct {
 	bool shoot_excute;
 	bool homing_excute;
 	bool auto_homing;
-	int count;
-}Shoot_Parameter_t;
 
+	uint32_t accel_time_start;
+	float accel_time_elaspe;
+
+	uint32_t brake_time_start;
+	float brake_time_elaspe;
+
+	uint32_t homing_time_start;
+	float homing_time_elaspe;
+	float homing_stable_time_elaspe;
+} shoot_parameter_t;
+
+typedef struct {
+	enum {
+		SEND_NONE = 0,
+		SEND_ACCEL_CURRENT,
+		SEND_BRAKE_CURRENT,
+		SEND_TARGET_SPEED,
+		SEND_HOME_ANGLE,
+		SEND_COMPLETE,
+	} SEND_STATUS_INDEX;
+	bool send_trigger;
+} shoot_parameter_communication_status_t;
 
 // Data types
 typedef enum {
@@ -656,7 +665,7 @@ typedef struct {
 	uint16_t crc;
 
 	subarea_PID_t subarea_PID;  //2.19.2024新增 可能在读数据的时候出错 事后补充：事实证明并不会出错！
-	Shoot_Parameter_t shoot_parameter;
+	shoot_parameter_t shoot_parameter;
 
 } mc_configuration;
 
@@ -1288,6 +1297,11 @@ typedef enum {
 	CAN_PACKET_ENABLE_AUTO_HOMING           = 87,  
 	CAN_PACKET_UPDATE_SHOOT_PARAMETER       = 88,  //TODO:把参数更新的CAN_decode加上
 	CAN_PACKET_SHOOT_PARAMETER_RECEIVED     = 89,
+	CAN_PACKET_SHOOT_GET_ACCEL_CURRENT      = 90,
+	CAN_PACKET_SHOOT_GET_BRAKE_CURRENT      = 91,
+	CAN_PACKET_SHOOT_GET_TARGET_SPEED       = 92,
+	CAN_PACKET_SHOOT_GET_HOME_ANGLE         = 93,
+	CAN_PACKET_RELEASE_MOTER                = 94,
 	CAN_PACKET_MAKE_ENUM_32_BITS = 0xFFFFFFFF,
 } CAN_PACKET_ID;
 
