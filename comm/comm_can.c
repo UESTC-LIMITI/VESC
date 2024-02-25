@@ -49,42 +49,6 @@
 
 //以下是shoot
 
-float home_angle = 20;
-float accel_current = 60.0f;
-float limit_speed = 20000.0f;
-float target_speed = 20000.0f;
-float limit_pos = 1500.0f;
-int sample_points = 1;
-float brake_current = 60.0f;
-CUSTOM_MODE custom_mode = CUSTOM_MODE_NONE;
-int reset_pos_sample_points = 5000;
-float reset_speed = 1000;
-int send_speed_counter = 0;
-int send_pos_counter = 0;
-float target_duty = 0.3f;
-//int test_flag = 0;
-extern float home_angle;
-extern float brake_pos;
-extern float brake_speed;
-extern uint8_t finish_flag;
-extern uint8_t state_now;
-extern float max_speed_record;
-extern float max_speed_pos_record;
-
-extern int16_t speed_record[SEND_NUM];
-extern int16_t pos_record[SEND_NUM];
-extern uint16_t record_counter;
-
-extern float dI;
-//extern int test_flag;
-//以上是shoot
-
-bool homing_flag = 0;
-int homing_count = 0;
-
-extern bool homing_flag;
-extern int homing_count;
-
 uint8_t send_subarea_PID_parameter_index = 0;
 extern uint8_t send_subarea_PID_parameter_index;
 
@@ -1259,16 +1223,6 @@ void comm_can_send_status3(uint8_t id, bool replace) {
 void comm_can_send_status4(uint8_t id, bool replace) {
 	int32_t send_index = 0;
 	uint8_t buffer[8];
-	if (send_speed_counter <= record_counter && send_speed_counter < SEND_NUM && finish_flag == 1) {
-		for (int i = 0; i < 4; i++) {
-			if(send_speed_counter < record_counter) {
-				buffer_append_int16(buffer, (int16_t)(speed_record[send_speed_counter++]), &send_index);
-				speed_record[send_speed_counter - 1] = 0;
-			} else {
-				buffer_append_int16(buffer, (int16_t)(0), &send_index);
-			}
-		}
-	}
 	comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_STATUS_4 << 8),
 			buffer, send_index, replace, 0);
 	
@@ -1277,18 +1231,9 @@ void comm_can_send_status4(uint8_t id, bool replace) {
 void comm_can_send_status5(uint8_t id, bool replace) {
 	int32_t send_index = 0;
 	uint8_t buffer[8];
-	if (send_pos_counter <= record_counter && send_pos_counter < SEND_NUM && finish_flag == 1) {
-		for (int i = 0; i < 4; i++) {
-			if(send_pos_counter < record_counter) {
-				buffer_append_int16(buffer, (int16_t)(pos_record[send_pos_counter++]), &send_index);
-				pos_record[send_pos_counter - 1] = 0;
-			} else {
-				buffer_append_int16(buffer, (int16_t)(0), &send_index);
-			}
-		}
 		comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_STATUS_5 << 8),
 			buffer, send_index, replace, 0);
-	}
+	
 }
 
 void comm_can_send_status6(uint8_t id, bool replace) {
@@ -1564,6 +1509,7 @@ bool subarea_PID_parameter_send(uint8_t index) {
 	return true;
 }
 
+
 static THD_FUNCTION(cancom_status_thread, arg) {  //通过can 状态信息发送的线程函数
 	(void)arg;
 	chRegSetThreadName("CAN status 1");
@@ -1581,7 +1527,7 @@ static THD_FUNCTION(cancom_status_thread, arg) {  //通过can 状态信息发送
 			send_subarea_PID_parameter_index == 3    ) {
 				subarea_PID_parameter_send(send_subarea_PID_parameter_index);
 				send_subarea_PID_parameter_index = 0;
-			}
+		}
 		chThdSleepMilliseconds(1);
 
 		
@@ -1738,102 +1684,20 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 			ind = 0;
 			uint32_t flag = buffer_get_uint32(data8, &ind);
 			mc_interface_subarea_PID_control_enable(flag);
-			break;
-
-        //以下都是shoot部分
-		case CAN_PACKET_SET_ACCEL_CURRENT:
-			ind = 0;
-			accel_current =(buffer_get_float32(data8, 1e3, &ind));
-			dI = accel_current / 600.0;
 			timeout_reset();
 			break;
 
-		case CAN_PACKET_SET_LIMIT_SPEED:
+		case CAN_PACKET_SELFLOCK:
 			ind = 0;
-			limit_speed = (buffer_get_float32(data8, 1e0, &ind));
+			mc_interface_set_selflock();
+			break;
+
+		case CAN_PACKET_RELEASE_MOTER:
+			ind = 0;
+			mc_interface_release_motor();
 			timeout_reset();
 			break;
 
-		case CAN_PACKET_SET_TARGET_SPEED:
-			ind = 0;
-			target_speed = (buffer_get_float32(data8, 1e0, &ind));
-			timeout_reset();
-			break;
-
-		case CAN_PACKET_SET_LIMIT_POS:
-			ind = 0;
-			limit_pos = (buffer_get_float32(data8, 50, &ind));
-			timeout_reset();
-			break;
-
-		case CAN_PACKET_SET_SAMPLE_POINTS:
-			ind = 0;
-			sample_points = (buffer_get_int32(data8, &ind));
-			timeout_reset();
-			break;
-
-		case CAN_PACKET_SET_BRAKE_CURRENT:
-			ind = 0;
-			brake_current = (buffer_get_float32(data8, 1e3, &ind));
-			timeout_reset();
-			break;
-
-		case CAN_PACKET_SET_CUSTOM_MODE:
-			ind = 0;
-			int temp = (buffer_get_int32(data8, &ind));
-			if (custom_mode == CUSTOM_MODE_NONE && state_now == 0)
-			{
-				// memset(speed_record, 0, sizeof(speed_record));
-				record_counter = 0;
-				switch (temp) {
-				case 1:
-					state_now++;
-					mc_interface_set_current(accel_current);
-					break;
-				default:
-					mc_interface_release_motor();
-					break;
-				}
-			}
-			custom_mode = ((CUSTOM_MODE)temp);
-			timeout_reset();
-			break;
-
-		case CAN_PACKET_SET_HOME:
-			ind = 0;
-			home_angle = mc_interface_get_pos_multiturn();
-			timeout_reset();
-			break;
-
-		case CAN_PACKET_HOMING:
-			homing_flag = 1;
-			mc_interface_set_pid_pos_multiturn(home_angle);
-			ind = 0;
-			timeout_reset();
-			break;
-
-		case CAN_PACKET_ALIVE:
-			ind = 0;
-			timeout_reset();
-			break;
-
-		case CAN_PACKET_SET_RESET_SPEED:
-			ind = 0;
-			reset_speed = (buffer_get_float32(data8, 1e0, &ind));
-			timeout_reset();
-			break;
-
-		case CAN_PACKET_SET_RESET_POS_SAMPLE_POINTS:
-			ind = 0;
-			reset_pos_sample_points = (buffer_get_int32(data8, &ind));
-			timeout_reset();
-			break;
-
-		case CAN_PACKET_SET_TARGET_DUTY:
-			ind = 0;
-			target_duty = (buffer_get_float32(data8, 1e5, &ind));
-			timeout_reset();
-			break;
 /****************************************** custom 部分结束~~ ********************************************/
 
 
@@ -1852,6 +1716,7 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 
 			memcpy(rx_buffer[buf_ind] + offset, data8, len);
 			rx_buffer_offset[buf_ind] += len;
+			timeout_reset();
 		} break;
 
 		case CAN_PACKET_FILL_RX_BUFFER_LONG: {
@@ -1872,6 +1737,7 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 				memcpy(rx_buffer[buf_ind] + offset, data8, len);
 				rx_buffer_offset[buf_ind] += len;
 			}
+			timeout_reset();
 		} break;
 
 		case CAN_PACKET_PROCESS_RX_BUFFER: {
@@ -1904,6 +1770,7 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 					rx_buffer_offset[i] = 0;
 				}
 				break;
+			timeout_reset();
 			}
 
 			rx_buffer_offset[buf_ind] = 0;
@@ -1939,6 +1806,7 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 					break;
 				}
 			}
+			timeout_reset();
 		} break;
 
 		case CAN_PACKET_PROCESS_SHORT_BUFFER: {
@@ -1956,6 +1824,7 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 						data8[ind] == COMM_WRITE_NEW_APP_DATA ||
 						data8[ind] == COMM_WRITE_NEW_APP_DATA_LZO ||
 						data8[ind] == COMM_ERASE_BOOTLOADER) {
+						timeout_reset();
 					break;
 				}
 			}
@@ -1973,6 +1842,7 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 			default:
 				break;
 			}
+			timeout_reset();
 		} break;
 
 		case CAN_PACKET_SET_CURRENT_REL:
@@ -2200,94 +2070,94 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 	// The packets below are addressed to all devices, mainly containing status information.
 
 	switch (cmd) {
-	case CAN_PACKET_STATUS:
-		for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
-			can_status_msg *stat_tmp = &stat_msgs[i];
-			if (stat_tmp->id == id || stat_tmp->id == -1) {
-				ind = 0;
-				stat_tmp->id = id;
-				stat_tmp->rx_time = chVTGetSystemTimeX();
-				stat_tmp->rpm = (float)buffer_get_int32(data8, &ind);
-				stat_tmp->current = (float)buffer_get_int16(data8, &ind) / 10.0;
-				stat_tmp->duty = (float)buffer_get_int16(data8, &ind) / 1000.0;
-				break;
-			}
-		}
-		break;
+	// case CAN_PACKET_STATUS:
+	// 	for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
+	// 		can_status_msg *stat_tmp = &stat_msgs[i];
+	// 		if (stat_tmp->id == id || stat_tmp->id == -1) {
+	// 			ind = 0;
+	// 			stat_tmp->id = id;
+	// 			stat_tmp->rx_time = chVTGetSystemTimeX();
+	// 			stat_tmp->rpm = (float)buffer_get_int32(data8, &ind);
+	// 			stat_tmp->current = (float)buffer_get_int16(data8, &ind) / 10.0;
+	// 			stat_tmp->duty = (float)buffer_get_int16(data8, &ind) / 1000.0;
+	// 			break;
+	// 		}
+	// 	}
+	// 	break;
 
-	case CAN_PACKET_STATUS_2:
-		for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
-			can_status_msg_2 *stat_tmp_2 = &stat_msgs_2[i];
-			if (stat_tmp_2->id == id || stat_tmp_2->id == -1) {
-				ind = 0;
-				stat_tmp_2->id = id;
-				stat_tmp_2->rx_time = chVTGetSystemTimeX();
-				stat_tmp_2->amp_hours = (float)buffer_get_int32(data8, &ind) / 1e4;
-				stat_tmp_2->amp_hours_charged = (float)buffer_get_int32(data8, &ind) / 1e4;
-				break;
-			}
-		}
-		break;
+	// case CAN_PACKET_STATUS_2:
+	// 	for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
+	// 		can_status_msg_2 *stat_tmp_2 = &stat_msgs_2[i];
+	// 		if (stat_tmp_2->id == id || stat_tmp_2->id == -1) {
+	// 			ind = 0;
+	// 			stat_tmp_2->id = id;
+	// 			stat_tmp_2->rx_time = chVTGetSystemTimeX();
+	// 			stat_tmp_2->amp_hours = (float)buffer_get_int32(data8, &ind) / 1e4;
+	// 			stat_tmp_2->amp_hours_charged = (float)buffer_get_int32(data8, &ind) / 1e4;
+	// 			break;
+	// 		}
+	// 	}
+	// 	break;
 
-	case CAN_PACKET_STATUS_3:
-		for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
-			can_status_msg_3 *stat_tmp_3 = &stat_msgs_3[i];
-			if (stat_tmp_3->id == id || stat_tmp_3->id == -1) {
-				ind = 0;
-				stat_tmp_3->id = id;
-				stat_tmp_3->rx_time = chVTGetSystemTimeX();
-				stat_tmp_3->watt_hours = (float)buffer_get_int32(data8, &ind) / 1e4;
-				stat_tmp_3->watt_hours_charged = (float)buffer_get_int32(data8, &ind) / 1e4;
-				break;
-			}
-		}
-		break;
+	// case CAN_PACKET_STATUS_3:
+	// 	for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
+	// 		can_status_msg_3 *stat_tmp_3 = &stat_msgs_3[i];
+	// 		if (stat_tmp_3->id == id || stat_tmp_3->id == -1) {
+	// 			ind = 0;
+	// 			stat_tmp_3->id = id;
+	// 			stat_tmp_3->rx_time = chVTGetSystemTimeX();
+	// 			stat_tmp_3->watt_hours = (float)buffer_get_int32(data8, &ind) / 1e4;
+	// 			stat_tmp_3->watt_hours_charged = (float)buffer_get_int32(data8, &ind) / 1e4;
+	// 			break;
+	// 		}
+	// 	}
+	// 	break;
 
-	case CAN_PACKET_STATUS_4:
-		for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
-			can_status_msg_4 *stat_tmp_4 = &stat_msgs_4[i];
-			if (stat_tmp_4->id == id || stat_tmp_4->id == -1) {
-				ind = 0;
-				stat_tmp_4->id = id;
-				stat_tmp_4->rx_time = chVTGetSystemTimeX();
-				stat_tmp_4->temp_fet = (float)buffer_get_int16(data8, &ind) / 10.0;
-				stat_tmp_4->temp_motor = (float)buffer_get_int16(data8, &ind) / 10.0;
-				stat_tmp_4->current_in = (float)buffer_get_int16(data8, &ind) / 10.0;
-				stat_tmp_4->pid_pos_now = (float)buffer_get_int16(data8, &ind) / 50.0;
-				break;
-			}
-		}
-		break;
+	// case CAN_PACKET_STATUS_4:
+	// 	for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
+	// 		can_status_msg_4 *stat_tmp_4 = &stat_msgs_4[i];
+	// 		if (stat_tmp_4->id == id || stat_tmp_4->id == -1) {
+	// 			ind = 0;
+	// 			stat_tmp_4->id = id;
+	// 			stat_tmp_4->rx_time = chVTGetSystemTimeX();
+	// 			stat_tmp_4->temp_fet = (float)buffer_get_int16(data8, &ind) / 10.0;
+	// 			stat_tmp_4->temp_motor = (float)buffer_get_int16(data8, &ind) / 10.0;
+	// 			stat_tmp_4->current_in = (float)buffer_get_int16(data8, &ind) / 10.0;
+	// 			stat_tmp_4->pid_pos_now = (float)buffer_get_int16(data8, &ind) / 50.0;
+	// 			break;
+	// 		}
+	// 	}
+	// 	break;
 
-	case CAN_PACKET_STATUS_5:
-		for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
-			can_status_msg_5 *stat_tmp_5 = &stat_msgs_5[i];
-			if (stat_tmp_5->id == id || stat_tmp_5->id == -1) {
-				ind = 0;
-				stat_tmp_5->id = id;
-				stat_tmp_5->rx_time = chVTGetSystemTimeX();
-				stat_tmp_5->tacho_value = buffer_get_int32(data8, &ind);
-				stat_tmp_5->v_in = (float)buffer_get_int16(data8, &ind) / 1e1;
-				break;
-			}
-		}
-		break;
+	// case CAN_PACKET_STATUS_5:
+	// 	for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
+	// 		can_status_msg_5 *stat_tmp_5 = &stat_msgs_5[i];
+	// 		if (stat_tmp_5->id == id || stat_tmp_5->id == -1) {
+	// 			ind = 0;
+	// 			stat_tmp_5->id = id;
+	// 			stat_tmp_5->rx_time = chVTGetSystemTimeX();
+	// 			stat_tmp_5->tacho_value = buffer_get_int32(data8, &ind);
+	// 			stat_tmp_5->v_in = (float)buffer_get_int16(data8, &ind) / 1e1;
+	// 			break;
+	// 		}
+	// 	}
+	// 	break;
 
-	case CAN_PACKET_STATUS_6:
-		for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
-			can_status_msg_6 *stat_tmp_6 = &stat_msgs_6[i];
-			if (stat_tmp_6->id == id || stat_tmp_6->id == -1) {
-				ind = 0;
-				stat_tmp_6->id = id;
-				stat_tmp_6->rx_time = chVTGetSystemTimeX();
-				stat_tmp_6->adc_1 = buffer_get_float16(data8, 1e3, &ind);
-				stat_tmp_6->adc_2 = buffer_get_float16(data8, 1e3, &ind);
-				stat_tmp_6->adc_3 = buffer_get_float16(data8, 1e3, &ind);
-				stat_tmp_6->ppm = buffer_get_float16(data8, 1e3, &ind);
-				break;
-			}
-		}
-		break;
+	// case CAN_PACKET_STATUS_6:
+	// 	for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
+	// 		can_status_msg_6 *stat_tmp_6 = &stat_msgs_6[i];
+	// 		if (stat_tmp_6->id == id || stat_tmp_6->id == -1) {
+	// 			ind = 0;
+	// 			stat_tmp_6->id = id;
+	// 			stat_tmp_6->rx_time = chVTGetSystemTimeX();
+	// 			stat_tmp_6->adc_1 = buffer_get_float16(data8, 1e3, &ind);
+	// 			stat_tmp_6->adc_2 = buffer_get_float16(data8, 1e3, &ind);
+	// 			stat_tmp_6->adc_3 = buffer_get_float16(data8, 1e3, &ind);
+	// 			stat_tmp_6->ppm = buffer_get_float16(data8, 1e3, &ind);
+	// 			break;
+	// 		}
+	// 	}
+	// 	break;
 
 	case CAN_PACKET_IO_BOARD_ADC_1_TO_4:
 		for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {

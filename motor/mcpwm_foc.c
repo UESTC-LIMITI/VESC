@@ -45,41 +45,6 @@
 
 //#define SHOOT_TEST
 
-int sampled_points = 0;
-uint8_t finish_flag = 0;
-float brake_pos = 0;
-float brake_speed = 0;
-uint8_t state_now = 0;
-float max_speed_record = 0;
-float max_speed_pos_record = 0;
-float reset_pos = 0;
-float reset_pos_deadband = 0.2;
-
-int16_t speed_record[SEND_NUM] = {0};
-int16_t pos_record[SEND_NUM] = {0};
-uint16_t record_counter = 0;
-bool can_send_enable = true;
-
-int16_t accel_counter = 0;
-float dI = 0.1;
-float sumI = 0;
-
-extern float accel_current;
-extern float limit_speed;
-extern float target_speed;
-extern float limit_pos;
-extern int sample_points;
-extern float brake_current;
-extern CUSTOM_MODE custom_mode;
-extern float reset_pos_sample_points;
-extern float target_duty;
-extern uint16_t record_counter;
-
-extern int send_speed_counter;
-extern int send_pos_counter;
-extern bool can_send_enable;
-
-
 // Private variables
 static volatile bool m_dccal_done = false;
 static volatile float m_last_adc_isr_duration;
@@ -419,11 +384,11 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 	m_motor_1.m_conf->subarea_PID.ki2 = 0.0009 * 3;                        \
 	m_motor_1.m_conf->subarea_PID.kd2 = 0.0003 * 3;                        \
 	m_motor_1.m_conf->subarea_PID.kd_proc2 = 0.0002 * 3;                   \
-	m_motor_1.m_conf->subarea_PID.enable_subarea_control = false;          \
 	m_motor_1.m_conf->subarea_PID.deadband = 0.08;                         \
 	m_motor_1.m_conf->subarea_PID.initialized = true;                      \
 /*
 /**************************************************************************/
+	m_motor_1.m_conf->subarea_PID.enable_subarea_control = false;          \
 
 	virtual_motor_init(conf_m1);
 
@@ -2827,6 +2792,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 	float dt = 1.0 / (conf_now->foc_f_zv / 2.0);
 #endif
 
+	
+
 	if (conf_other->foc_control_sample_mode == FOC_CONTROL_SAMPLE_MODE_V0_V7_INTERPOL && !skip_interpolation) {
 		float interpolated_phase = motor_other->m_motor_state.phase + motor_other->m_speed_est_fast * dt * 0.5;  //相位插值计算
 		utils_norm_angle_rad(&interpolated_phase);
@@ -3580,106 +3547,6 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 
 	m_isr_motor = 0;
 	m_last_adc_isr_duration = timer_seconds_elapsed_since(t_start);
-
-	// Calculate the position of multiple turns
-	float mul_pos = mc_interface_get_pos_multiturn();
-
-	// Record max speed
-	if (mc_interface_get_rpm() > max_speed_record) {
-		max_speed_record = mc_interface_get_rpm();
-		max_speed_pos_record = mul_pos;
-	}
-		
-
-	// Custom mode
-	if (custom_mode == CUSTOM_MODE_NONE) {
-		finish_flag = 0;
-		sampled_points = 0;
-		max_speed_record = 0;
-		max_speed_pos_record = 0;
-		send_speed_counter = 0;
-		send_pos_counter = 0;
-		record_counter = 0;
-	} else if (custom_mode == CUSTOM_MODE_1) {
-		if (finish_flag == 0) {
-			switch (state_now) {
-			case 1:
-				if (mc_interface_get_rpm() >= target_speed) {
-					mc_interface_set_brake_current(brake_current);
-					brake_pos = mul_pos;
-					brake_speed = mc_interface_get_rpm();
-					sampled_points = 0;
-					finish_flag = 1;
-					state_now = 0;
-				}
-				break;
-			default:
-				break;
-			}
-		}
-	} else if (custom_mode == CUSTOM_MODE_2) {
-		if (finish_flag == 0) {
-			switch (state_now) {
-			case 1:
-				if (mc_interface_get_rpm() >= limit_speed) {
-					sampled_points++;
-					if (sampled_points >= sample_points) {
-						mc_interface_set_pid_speed(target_speed);
-						sampled_points = 0;
-						state_now++;
-					}
-				} else
-					sampled_points = 0;
-				break;
-			case 2:
-				if (mul_pos >= limit_pos) {
-					sampled_points++;
-					if (sampled_points >= sample_points) {
-						mc_interface_set_brake_current(brake_current);
-						brake_pos = mul_pos;
-						brake_speed = mc_interface_get_rpm();
-						sampled_points = 0;
-						finish_flag = 1;
-						state_now = 0;
-					}
-				} else
-					sampled_points = 0;
-				break;
-			default:
-				break;
-			}
-		}
-	} else if (custom_mode == CUSTOM_MODE_3) {
-		if (finish_flag == 0) {
-			switch (state_now) {
-			case 1:
-				if (mul_pos <= 180 && mul_pos >= -180) {
-					sampled_points++;
-					if (sampled_points >= sample_points) {
-						mc_interface_set_pid_pos(reset_pos);
-						sampled_points = 0;
-						state_now++;
-					}
-				} else
-					sampled_points = 0;
-				break;
-			case 2:
-				if (mul_pos <= reset_pos + reset_pos_deadband && mul_pos >= reset_pos - reset_pos_deadband) {
-					sampled_points++;
-					if (sampled_points >= reset_pos_sample_points) {
-						mc_interface_set_brake_current(brake_current);
-						sampled_points = 0;
-						finish_flag = 1;
-						state_now = 0;
-					}
-				} else
-					sampled_points = 0;
-				break;
-			default:
-				break;
-			}
-		}
-	}
 	
 }
 
@@ -4223,6 +4090,7 @@ static THD_FUNCTION(pid_thread, arg) {
 		foc_run_pid_control_pos(encoder_index_found(), dt, (motor_all_state_t*)&m_motor_1);
 		foc_run_pid_control_speed(dt, (motor_all_state_t*)&m_motor_1);
 		foc_run_pid_control_pos_multiturn(encoder_index_found(), dt, (motor_all_state_t*)&m_motor_1);
+		mc_interface_vector_wheel_test();
 #ifdef HW_HAS_DUAL_MOTORS
 		foc_run_pid_control_pos(encoder_index_found(), dt, (motor_all_state_t*)&m_motor_2);
 		foc_run_pid_control_speed(dt, (motor_all_state_t*)&m_motor_2);

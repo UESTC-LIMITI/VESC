@@ -21,8 +21,6 @@
 #include "utils_math.h"
 #include <math.h>
 
-extern bool homing_flag;
-extern int homing_count;
 
 
 #define POS_PID_DEADBAND 1.5
@@ -601,23 +599,6 @@ void foc_run_pid_control_pos_multiturn(bool index_found, float dt, motor_all_sta
 
 	// Calculate output
 	float output = p_term + motor->m_pos_i_term + d_term + d_term_proc;
-    //以下这些是shoot关于自动归位的内容
-	if (homing_flag) {
-		if (error_abs > 20) {
-			utils_truncate_number(&output, -0.06, 0.06);
-		} else {
-			utils_truncate_number(&output, -error_abs/20, error_abs/20);
-		}
-		if (error_abs < 1) {
-			homing_count ++;
-			if (homing_count > 10000) {
-				homing_count = 0;
-				homing_flag = 0;
-			}
-		} else {
-			homing_count = 0;
-		}
-	}
 	utils_truncate_number(&output, -0.6, 0.6);   //虽然Kp输出不限幅但是最后会限幅
 
 	if (conf_now->m_sensor_port_mode != SENSOR_PORT_MODE_HALL) {

@@ -2,8 +2,8 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-28 09:12:06
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2024-02-18 22:24:05
- * @FilePath: \MDK-ARM\RM3508\VESC_CAN.c
+ * @LastEditTime: 2024-03-01 09:23:48
+ * @FilePath: \VESC_Code\VESC对接的库\新的 适配新固件\VESC_CAN.c
  * @Description: 
  * VESC_CAN 1.0 曹总写的库 回传有问题，发送和设置模式分开 10.28.2021
  * VESC_CAN 2.0 GTY改写   可自定义回传，将命令函数分为单独的函数，与RM3508的库类似 1.29.2024
@@ -386,6 +386,25 @@ int32_t uchar2int32(uint8_t* buffer, int32_t *index) {
 	return temp;
 }
 /*************************************************************************************/
+
+/**
+ * @description:       直接控在当前位置自锁
+ * @param {uint8_t} id VESC id
+ * @param {CAN_HandleTypeDef} *hcan 目标CAN
+ * @param {uint32_t} flag 置1自锁，置0释放
+ * @return {*}         处
+ */
+bool VESC_SelfLock(uint8_t id, CAN_HandleTypeDef *hcan, uint32_t flag) {
+	if (id > 255 || id <= 0) {
+		VESC_Error_Handler(Set_id_Wrong);
+	}
+	int32_t ind = 0;
+	uint32_t eid = (id & 0xff) | ((uint32_t)CAN_PACKET_SELFLOCK << 8);
+	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
+	buffer_append_uint32(VESC_Send_Buffer, flag, &ind);
+	VESC_CAN_SendData(hcan, id, eid, 4);
+	return true;
+}
 
 /**
  * @description:            CAN消息解码  

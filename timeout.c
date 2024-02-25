@@ -239,14 +239,14 @@ static THD_FUNCTION(timeout_thread, arg) {
 		// Monitored threads (foc, can, timer) must report at least one iteration,
 		// otherwise the watchdog won't be feed and MCU will reset. All threads should
 		// be monitored
-		if(feed_counter[THREAD_MCPWM] < MIN_THREAD_ITERATIONS) {
-			threads_ok = false;
-		}
+		// if(feed_counter[THREAD_MCPWM] < MIN_THREAD_ITERATIONS) {
+		// 	threads_ok = false;
+		// }
 
 #if CAN_ENABLE
-		if(feed_counter[THREAD_CANBUS] < MIN_THREAD_ITERATIONS) {
-			threads_ok = false;
-		}
+		// if(feed_counter[THREAD_CANBUS] < MIN_THREAD_ITERATIONS) {
+		// 	threads_ok = false;
+		// }
 #endif
 
 		for( int i = 0; i < MAX_THREADS_MONITOR; i++) {

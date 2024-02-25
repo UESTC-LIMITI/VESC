@@ -28,19 +28,6 @@
 //#define USE_CUSTOM_ENCODER1
 
 
-#define SEND_NUM 20
-
-typedef enum {
-	CUSTOM_MODE_NONE = 0,
-	CUSTOM_MODE_1,
-	CUSTOM_MODE_2,
-	CUSTOM_MODE_3,
-	CUSTOM_MODE_4,
-	CUSTOM_MODE_5,
-	CUSTOM_MODE_6,
-	CUSTOM_MODE_7,
-} CUSTOM_MODE;
-
 typedef struct  {
 	float subarea_1;
 	float subarea_2;
@@ -221,6 +208,7 @@ typedef enum {
 	CONTROL_MODE_OPENLOOP_DUTY_PHASE,
 	CONTROL_MODE_NONE,
     CONTROL_MODE_POS_MULTITURN,  //2.15.2024新增多圈位置控制
+    CONTROL_MODE_SELFLOCK,       //3.1.2024新增舵轮自锁
 	} mc_control_mode;
 
 typedef enum {
@@ -1226,6 +1214,9 @@ typedef enum {
 	CAN_PACKET_SET_SUBAREA_PARA3			= 82,
 	CAN_PACKET_STORE_MC_CONFIGURATION		= 83,
 	CAN_PACKET_ENABLE_SUBAREA_PID	        = 84,
+	CAN_PACKET_SELFLOCK	                    = 85,
+	CAN_PACKET_RELEASE_MOTER                = 94,
+	CAN_PACKET_VECTOR_WHEEL_TEST            = 95,
 	CAN_PACKET_MAKE_ENUM_32_BITS = 0xFFFFFFFF,
 } CAN_PACKET_ID;
 

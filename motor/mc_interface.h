@@ -158,6 +158,12 @@ bool mc_interface_set_subarea_PID_parameter2 (uint8_t* buffer);
 bool mc_interface_set_subarea_PID_parameter3 (uint8_t* buffer);
 bool mc_interface_store_mc_configuration (bool is_motor_2);
 bool mc_interface_subarea_PID_control_enable (uint32_t flag);
+bool mc_interface_selflock (uint32_t flag);
+extern VECTOR_WHEEL_TEST_STATUS_t TEST_STATUS;
+extern float acc_elaspe;
+extern uint32_t acc_start ;
+extern bool test_start ;
+bool mc_interface_vector_wheel_test (void);
 
 /**************************************************************************************************/
 
