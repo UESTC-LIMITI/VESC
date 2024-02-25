@@ -3326,23 +3326,24 @@ bool mc_interface_shoot_excute (void) {
 			para->brake_time_elaspe = 0.0f;
 			return false;
 		}
-		if (mc_interface_get_rpm() < 100.0f && para->brake_time_elaspe > 2.0f ) {
+		if (mc_interface_get_rpm() < 20.0f /*&& para->brake_time_elaspe > 2.0f*/ ) {
 			if (para->auto_homing == true) {
 				homing_flag = true;
 				para->SHOOT_STATUS = SHOOT_HOMING;
-				para->brake_time_elaspe = 0.0f;
 				para->homing_time_start = timer_time_now();
+				para->brake_time_elaspe = 0.0f;
 			} else if (para->homing_excute == true) {
 				homing_flag = true;
 				para->SHOOT_STATUS = SHOOT_HOMING;
-				para->brake_time_elaspe = 0.0f;
 				para->homing_time_start = timer_time_now();
+				para->brake_time_elaspe = 0.0f;
 			}
 		}
 		timeout_reset();
 		break;
 	
 	case SHOOT_HOMING:
+		para->brake_time_elaspe = 0.0f;
 		para->homing_time_elaspe = timer_seconds_elapsed_since(para->homing_time_start);
 		if (para->homing_time_elaspe > 100.0f) { //遇到计时器跳变这种小概率事件，重置计时
 			para->homing_time_start = timer_time_now();

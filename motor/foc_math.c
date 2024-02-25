@@ -24,7 +24,6 @@
 extern bool homing_flag;
 extern int homing_count;
 
-#define PTZ_USED
 
 #define POS_PID_DEADBAND 1.5
 #define POS_PID_DEADBAND_GAIN 3
@@ -390,6 +389,14 @@ void foc_run_pid_control_pos(bool index_found, float dt, motor_all_state_t *moto
 	float ki = conf_now->p_pid_ki;
 	float kd = conf_now->p_pid_kd;
 	float kd_proc = conf_now->p_pid_kd_proc;
+	#if defined(PTZ_USED) 
+	if (error_abs < 2) {
+		ki = 0.001;
+		kp = 0.02;
+		kd = 0;
+		kd_proc = 0;
+	}
+	#endif
 
 	if (subarea_PID->enable_subarea_control) {
 		if (error_abs < subarea_PID->deadband) {
@@ -465,6 +472,7 @@ void foc_run_pid_control_pos(bool index_found, float dt, motor_all_state_t *moto
 	float output = p_term + motor->m_pos_i_term + d_term + d_term_proc;
 	utils_truncate_number(&output, -1.0, 1.0);
 
+#if defined(PTZ_USED) 
 	if (error_abs > 20) {
 		utils_truncate_number(&output, -0.15f, 0.15f);
 	}
@@ -486,6 +494,12 @@ void foc_run_pid_control_pos(bool index_found, float dt, motor_all_state_t *moto
 	else if (error_abs > 2) {
 		utils_truncate_number(&output, -1.0f, 1.0f);
 	}
+	else if (error_abs < 2) {
+		utils_truncate_number(&output, -((error_abs/2)*0.4), -((error_abs/2)*0.4));
+	}
+	else if (error_abs < 0.05) {
+		output = 0.0f;
+	}
 	if (angle_set_last != angle_set) {
 		set_angle_changed_start = timer_time_now();
 		angle_changed = true;
@@ -496,6 +510,7 @@ void foc_run_pid_control_pos(bool index_found, float dt, motor_all_state_t *moto
 		angle_changed = false;
 	}
 	angle_set_last = angle_set;
+#endif
 
 	if (conf_now->m_sensor_port_mode != SENSOR_PORT_MODE_HALL) {
 		if (index_found) {
@@ -651,8 +666,8 @@ void foc_run_pid_control_pos_multiturn(bool index_found, float dt, motor_all_sta
 
 		time_autohoming_elaspe = timer_seconds_elapsed_since(time_autohoming_start);
 
-		if (error_abs > 2) {
-			utils_truncate_number(&output, -0.02, 0.02);
+		if (error_abs > 20) {
+			utils_truncate_number(&output, -0.04, 0.04);
 		} else {
 			utils_truncate_number(&output, -0.5, 0.5);
 		}

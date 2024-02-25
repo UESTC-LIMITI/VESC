@@ -2749,10 +2749,11 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 
 	mc_configuration *conf_now = motor_now->m_conf;
 	mc_configuration *conf_other = motor_other->m_conf;
-
-	if (fabs(mc_interface_get_rpm()) > 1000) {
-		mc_interface_fault_stop(0, false, true);
-	}
+// #if defined (PTZ_USED)
+// 	if (fabs(mc_interface_get_rpm()) > 1000) {
+// 		mc_interface_fault_stop(0, false, true);
+// 	}
+// #endif
 
 	bool skip_interpolation = motor_other->m_cc_was_hfi;
 

@@ -28,6 +28,7 @@
 //#define USE_CUSTOM_ENCODER1
 
 
+//#define PTZ_USED
 
 
 typedef struct  {
@@ -49,39 +50,6 @@ typedef struct  {
 #define SUBAREA1    1.5
 #define SUBAREA2    0.2
 
-// int sampled_points = 0;
-// uint8_t finish_flag = 0;
-// float brake_pos = 0;
-// float brake_speed = 0;
-// uint8_t state_now = 0;
-// float max_speed_record = 0;
-// float max_speed_pos_record = 0;
-// float reset_pos = 0;
-// float reset_pos_deadband = 0.2;
-
-// int16_t speed_record[SEND_NUM] = {0};
-// int16_t pos_record[SEND_NUM] = {0};
-// uint16_t record_counter = 0;
-// bool can_send_enable = true;
-
-// int16_t accel_counter = 0;
-// float dI = 0.1;
-// float sumI = 0;
-
-// extern float accel_current;
-// extern float limit_speed;
-// extern float target_speed;
-// extern float limit_pos;
-// extern int sample_points;
-// extern float brake_current;
-// extern CUSTOM_MODE custom_mode;
-// extern float reset_pos_sample_points;
-// extern float target_duty;
-// extern uint16_t record_counter;
-
-// extern int send_speed_counter;
-// extern int send_pos_counter;
-// extern bool can_send_enable;
 
 typedef enum {
 	SHOOT_DISABLE = 0,
