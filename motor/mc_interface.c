@@ -3297,6 +3297,7 @@ bool mc_interface_shoot_excute (void) {
 		para->accel_time_elaspe = timer_seconds_elapsed_since(para->accel_time_start);
 		if (para->accel_time_elaspe > 100.0f) { //遇到计时器跳变这种小概率事件，重置计时
 			para->accel_time_start = timer_time_now();
+			para->accel_time_elaspe = timer_seconds_elapsed_since(para->accel_time_start);
 		}
 		else if (para->accel_time_elaspe > 2.0f) {
 			para->SHOOT_STATUS = SHOOT_DISABLE;
@@ -3318,14 +3319,15 @@ bool mc_interface_shoot_excute (void) {
 		para->brake_time_elaspe = timer_seconds_elapsed_since(para->brake_time_start);
 		if (para->brake_time_elaspe > 100.0f) { //遇到计时器跳变这种小概率事件，重置计时
 			para->brake_time_start = timer_time_now();
+			para->brake_time_elaspe = timer_seconds_elapsed_since(para->brake_time_start);
 		}
-		mc_interface_set_brake_current(para->brake_current);
-		if (para->brake_time_elaspe > 20.0f) {
+		else if (para->brake_time_elaspe > 20.0f) {
 			para->SHOOT_STATUS = SHOOT_DISABLE;
 			mc_interface_release_motor();
 			para->brake_time_elaspe = 0.0f;
 			return false;
 		}
+		mc_interface_set_brake_current(para->brake_current);
 		if (mc_interface_get_rpm() < 20.0f /*&& para->brake_time_elaspe > 2.0f*/ ) {
 			if (para->auto_homing == true) {
 				homing_flag = true;
@@ -3347,6 +3349,7 @@ bool mc_interface_shoot_excute (void) {
 		para->homing_time_elaspe = timer_seconds_elapsed_since(para->homing_time_start);
 		if (para->homing_time_elaspe > 100.0f) { //遇到计时器跳变这种小概率事件，重置计时
 			para->homing_time_start = timer_time_now();
+			para->homing_time_elaspe = timer_seconds_elapsed_since(para->homing_time_start);
 		}
 		else if (para->homing_time_elaspe > 10.0f) {
 			para->SHOOT_STATUS = SHOOT_DISABLE;
