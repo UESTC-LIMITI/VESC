@@ -46,4 +46,6 @@ double buffer_get_double64(const uint8_t *buffer, double scale, int32_t *index);
 float buffer_get_float32_auto(const uint8_t *buffer, int32_t *index);
 double buffer_get_float64_auto(const uint8_t *buffer, int32_t *index);
 
+void buffer_append_float32_direct (uint8_t* buffer, float num, int32_t* index);
+
 #endif /* BUFFER_H_ */

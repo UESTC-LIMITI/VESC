@@ -1186,7 +1186,7 @@ void comm_can_send_status1(uint8_t id, bool replace) {  //can status 状态消�
 	custom_append_float(buffer, (float)mc_interface_get_duty_cycle_now(), &send_index);
 #else
 	buffer_append_int32(buffer, (int32_t)mc_interface_get_rpm(), &send_index);
-	buffer_append_int32(buffer, (int16_t)(mc_interface_get_duty_cycle_now() * 1e3), &send_index);
+	buffer_append_float32_direct(buffer, mc_interface_get_duty_cycle_now(), &send_index);
 #endif
 	comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_STATUS << 8),
 			buffer, send_index, replace, 0);
@@ -1689,7 +1689,18 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 
 		case CAN_PACKET_SELFLOCK:
 			ind = 0;
-			mc_interface_set_selflock();
+			if (SELF_LOCK_STATUS == SELF_LOCK_DISABLE) {
+				self_lock_start = true;
+			}
+			timeout_reset();
+			break;
+
+		case CAN_PACKET_SELFLOCK_RELEASE:
+			ind = 0;
+			if (SELF_LOCK_STATUS == SELF_LOCK_LOCKING) {
+				self_lock_end = true;
+			}
+			timeout_reset();
 			break;
 
 		case CAN_PACKET_RELEASE_MOTER:

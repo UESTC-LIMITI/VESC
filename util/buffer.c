@@ -20,6 +20,7 @@
 #include "buffer.h"
 #include <math.h>
 #include <stdbool.h>
+#include <string.h>
 
 void buffer_append_int16(uint8_t* buffer, int16_t number, int32_t *index) {
 	buffer[(*index)++] = number >> 8;
@@ -246,4 +247,11 @@ double buffer_get_float64_auto(const uint8_t *buffer, int32_t *index) {
 	double n = buffer_get_float32_auto(buffer, index);
 	double err = buffer_get_float32_auto(buffer, index);
 	return n + err;
+}
+
+void buffer_append_float32_direct (uint8_t* buffer, float num, int32_t* index) {
+	float souece = num;
+	uint32_t des = 0;
+	memcpy(&des, &souece, 4);
+	buffer_append_uint32(buffer, des, index);
 }

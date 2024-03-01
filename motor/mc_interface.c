@@ -3187,61 +3187,47 @@ bool mc_interface_subarea_PID_control_enable (uint32_t flag) {
 
 /**
  * @description: 电机自锁 比set_current_break更死的锁定
- * @param {uint32_t} flag 置0释放电机 置1读取当前位置并锁死
+ * @param {uint32_t} flag 置0 置1读取当前位置并锁死
  * @return {*}
  */
-bool mc_interface_selflock (uint32_t flag) {
-	if (flag == 0) {
-		mc_interface_release_motor();
-		return false;
-	} else if (flag == 1) {
-		float pos_now = mc_interface_get_pid_pos_now();
-		mc_interface_set_pid_pos(pos_now);
-	}
-	return true;
-}
-
-VECTOR_WHEEL_TEST_STATUS_t TEST_STATUS = 0;
-float acc_elaspe = 0;
-uint32_t acc_start = 0;
-bool test_start = false;
-
-
-bool mc_interface_vector_wheel_test (void) {
-	switch (TEST_STATUS) {
-	case STATUS_READY:
-		if (test_start) {
-			test_start = false;
-			TEST_STATUS = STATUS_ACCEL;
-			acc_start = timer_time_now();
-		}
-		timeout_reset();
-		break;
-	
-	case STATUS_ACCEL:
-		acc_elaspe = timer_seconds_elapsed_since(acc_start);
-		if (acc_elaspe > 1.0f) {
-			TEST_STATUS = STATUS_DECEL;
-			
-			acc_elaspe = 0;
+SELF_LOCK_STATUS_t SELF_LOCK_STATUS = SELF_LOCK_DISABLE;
+bool self_lock_start = false;
+bool self_lock_end = false;
+bool self_lock_pos_recorded = false;
+bool self_lock_over = false;
+float self_lock_pos = 0.0f;
+bool mc_interface_selflock (void) {
+	SELF_LOCK_STATUS_t* status = &SELF_LOCK_STATUS;
+	switch (*status) {
+		case SELF_LOCK_DISABLE:
+			if (self_lock_start == true) {
+				self_lock_start = false;
+				*status = SELF_LOCK_RECODE_POS;
+			}
 			return false;
-		}
-		mc_interface_set_pid_speed(2000);
-		timeout_reset();
-		break;
-	
-	case STATUS_DECEL:
-		mc_interface_set_brake_current(40);
-		if (mc_interface_get_rpm() < 20.0f /*&& para->brake_time_elaspe > 2.0f*/ ) {
-			TEST_STATUS = STATUS_OVER;
-		}
-		timeout_reset();
-		break;
-	
+			break;
 
-	default:
-		timeout_reset();
-		break;
+		case SELF_LOCK_RECODE_POS:
+			if (self_lock_pos_recorded == false) {
+				self_lock_pos_recorded = true;
+				self_lock_pos = mc_interface_get_pos_multiturn();
+				*status = SELF_LOCK_LOCKING;
+			}
+			break;
+
+		case SELF_LOCK_LOCKING:
+			mc_interface_set_pid_pos_multiturn(self_lock_pos);
+			if(self_lock_end == true) {
+				self_lock_end = false;
+				mc_interface_release_motor();
+				*status = SELF_LOCK_OVER;
+			}
+			break;
+
+		case SELF_LOCK_OVER:
+			self_lock_pos_recorded = false;
+			*status = SELF_LOCK_DISABLE;
+			break;
 	}
 	return true;
 }

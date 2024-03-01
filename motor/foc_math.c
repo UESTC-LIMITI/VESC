@@ -599,7 +599,10 @@ void foc_run_pid_control_pos_multiturn(bool index_found, float dt, motor_all_sta
 
 	// Calculate output
 	float output = p_term + motor->m_pos_i_term + d_term + d_term_proc;
-	utils_truncate_number(&output, -0.6, 0.6);   //虽然Kp输出不限幅但是最后会限幅
+	// if (error_abs > 360) {
+	// 	utils_truncate_number(&output, -0.5, 0.5);  //根据需要改
+	// }
+	utils_truncate_number(&output, -1.0, 1.0);   //虽然Kp输出不限幅但是最后会限幅
 
 	if (conf_now->m_sensor_port_mode != SENSOR_PORT_MODE_HALL) {
 		if (index_found) {
