@@ -177,3 +177,11 @@ float buffer_get_float32_auto(const uint8_t *buffer, int32_t *index) {
 
 	return ldexpf(sig, e);
 }
+
+void buffer_append_float32_direct (uint8_t* buffer, float num, int32_t* index) {
+	float souece = num;
+	uint32_t des = 0;
+	memcpy(&des, &souece, 4);
+	buffer_append_uint32(buffer, des, index);
+}
+

@@ -37,4 +37,7 @@ float buffer_get_float16(const uint8_t *buffer, float scale, int32_t *index);
 float buffer_get_float32(const uint8_t *buffer, float scale, int32_t *index);
 float buffer_get_float32_auto(const uint8_t *buffer, int32_t *index);
 
+void buffer_append_float32_direct (uint8_t* buffer, float num, int32_t* index);
+
+
 #endif /* BUFFER_H_ */
