@@ -86,6 +86,8 @@ typedef enum {                              //VESC里定义的CAN数据包类型
 	CAN_PACKET_SHOOT_GET_TARGET_SPEED       = 92,
 	CAN_PACKET_SHOOT_GET_HOME_ANGLE         = 93,
 
+	CAN_PACKET_SHOOT_SET_PTZ_ANGLE          = 64,
+
 	CAN_PACKET_RELEASE_MOTER        = 94,
 } CAN_PACKET_ID;
 

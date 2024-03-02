@@ -474,42 +474,44 @@ void foc_run_pid_control_pos(bool index_found, float dt, motor_all_state_t *moto
 
 #if defined(PTZ_USED) 
 	if (error_abs > 20) {
-		utils_truncate_number(&output, -0.15f, 0.15f);
+		utils_truncate_number(&output, -0.2f, 0.2f);
 	}
 	if (error_abs > 15) {
-		utils_truncate_number(&output, -0.2f, 0.2f);
+		utils_truncate_number(&output, -0.25f, 0.25f);
 	}
 	else if (error_abs > 8) {
 		utils_truncate_number(&output, -0.3f, 0.3f);
 	}
 	else if (error_abs > 4) {
-		utils_truncate_number(&output, -0.4f, 0.4f);
+		utils_truncate_number(&output, -0.35f, 0.35f);
 	}
 	else if (error_abs > 4.5) {
-		utils_truncate_number(&output, -0.55f, 0.55f);
+		utils_truncate_number(&output, -0.4f, 0.4f);
 	}
 	else if (error_abs > 4) {
-		utils_truncate_number(&output, -0.8f, 0.8f);
+		utils_truncate_number(&output, -0.6f, 0.6f);
 	}
 	else if (error_abs > 2) {
+		utils_truncate_number(&output, -0.8f, 0.8f);
+	}
+	else if (error_abs > 1) {
 		utils_truncate_number(&output, -1.0f, 1.0f);
 	}
-	else if (error_abs < 2) {
-		utils_truncate_number(&output, -((error_abs/2)*0.4), -((error_abs/2)*0.4));
+	else if (error_abs < 1) {
+		utils_truncate_number(&output, -((error_abs/1)*0.4) - 0.3f, ((error_abs/1)*0.4) + 0.3f);
 	}
-	else if (error_abs < 0.05) {
-		output = 0.0f;
+	else if (error_abs < 0.04) {  //3.2.2024 再次修改限幅
 	}
-	if (angle_set_last != angle_set) {
-		set_angle_changed_start = timer_time_now();
-		angle_changed = true;
-	}
-	if (timer_seconds_elapsed_since(set_angle_changed_start) < 0.5 && angle_changed == true) {
-		utils_truncate_number(&output, -0.2f, 0.2f);  //给的角度稳定了再把限幅搞大
-	} else {
-		angle_changed = false;
-	}
-	angle_set_last = angle_set;
+	// if (angle_set_last != angle_set) {
+	// 	set_angle_changed_start = timer_time_now();
+	// 	angle_changed = true;
+	// }
+	// if (timer_seconds_elapsed_since(set_angle_changed_start) < 0.5 && angle_changed == true) {
+	// 	utils_truncate_number(&output, -0.2f, 0.2f);  //给的角度稳定了再把限幅搞大
+	// } else {
+	// 	angle_changed = false;
+	// }
+	// angle_set_last = angle_set;
 #endif
 
 	if (conf_now->m_sensor_port_mode != SENSOR_PORT_MODE_HALL) {

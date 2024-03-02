@@ -56,8 +56,10 @@ int homing_count = 0;
 extern bool homing_flag;
 extern int homing_count;
 
-uint8_t send_subarea_PID_parameter_index = 0;
+uint8_tsend_subarea_PID_parameter_index = 0;
 extern uint8_t send_subarea_PID_parameter_index;
+
+bool send_ptz_angle = false;
 
 // Settings
 #define RX_FRAMES_SIZE	50
@@ -1596,6 +1598,16 @@ bool shoot_parameter_send(void) {
 	return true;
 }
 
+bool ptz_status_send (void) {
+	bool ret = false;
+	uint8_t send_buffer[4] = {0};
+	int32_t ind = 0;
+	float angle = mc_interface_get_configuration()->shoot_ptz_angle;
+	buffer_append_float32(send_buffer, angle, 1e6, &ind);
+	comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_SHOOT_GET_PTZ_ANGLE << 8), send_buffer, 4, true, 0);
+	return ret;
+}
+
 static THD_FUNCTION(cancom_status_thread, arg) {  //通过can 状态信息发送的线程函数
 	(void)arg;
 	chRegSetThreadName("CAN status 1");
@@ -1613,7 +1625,15 @@ static THD_FUNCTION(cancom_status_thread, arg) {  //通过can 状态信息发送
 			send_subarea_PID_parameter_index == 3    ) {
 				subarea_PID_parameter_send(send_subarea_PID_parameter_index);
 				send_subarea_PID_parameter_index = 0;
+				chThdSleepMilliseconds(1);
 		}
+
+		if (send_ptz_angle == true) {
+			ptz_status_send();
+			send_ptz_angle = false;
+			chThdSleepMilliseconds(1);
+		}
+
 		shoot_parameter_send();
 		chThdSleepMilliseconds(1);
 
@@ -1867,9 +1887,15 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 			timeout_reset();
 			break;
 
-			
+		case CAN_PACKET_SHOOT_SET_PTZ_ANGLE:
+			mc_interface_update_ptz_angle();
+			timeout_reset();	
+			break;
 
-
+		case CAN_PACKET_SHOOT_GET_PTZ_ANGLE:
+			send_ptz_angle = true;
+			timeout_reset();		
+			break;
 
 /****************************************** custom 部分结束~~ ********************************************/
 

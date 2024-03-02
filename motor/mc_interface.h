@@ -175,6 +175,7 @@ bool mc_interface_set_shoot_brake_current (float brk_cur);
 bool mc_interface_set_shoot_target_speed (float tar_spd);
 bool mc_interface_shoot_homing (void);
 bool mc_interface_auto_homing_enable (uint32_t flag);
+bool mc_interface_update_ptz_angle(void);
 
 bool mc_interface_shoot_excute (void);  //loop excute
 /**************************************************************************************************/

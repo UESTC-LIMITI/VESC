@@ -3381,6 +3381,11 @@ bool mc_interface_shoot_excute (void) {
 	return true;
 }
 
+bool mc_interface_update_ptz_angle(void) {
+	mc_interface_get_configuration()->shoot_ptz_angle = motor_now()->m_position_set;
+	return true;
+}
+
 void mc_interface_custom_pwm_callback (void) {
 	mc_interface_shoot_excute();
 	//可以自定义一些逻辑

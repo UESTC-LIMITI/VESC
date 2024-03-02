@@ -28,7 +28,7 @@
 //#define USE_CUSTOM_ENCODER1
 
 
-//#define PTZ_USED
+#define PTZ_USED
 
 
 typedef struct  {
@@ -634,6 +634,7 @@ typedef struct {
 
 	subarea_PID_t subarea_PID;  //2.19.2024新增 可能在读数据的时候出错 事后补充：事实证明并不会出错！
 	shoot_parameter_t shoot_parameter;
+	float shoot_ptz_angle;      //3.2.2024新增储存云台角度
 
 } mc_configuration;
 
@@ -1234,21 +1235,6 @@ typedef enum {
 	CAN_PACKET_GNSS_LAT						= 60,
 	CAN_PACKET_GNSS_LON						= 61,
 	CAN_PACKET_GNSS_ALT_SPEED_HDOP			= 62,
-#if defined(SHOOT_TEST)  //SHOOT_TEST消息解码枚举体
-	CAN_PACKET_SET_ACCEL_CURRENT			= 63,
-	CAN_PACKET_SET_LIMIT_SPEED				= 64,
-	CAN_PACKET_SET_TARGET_SPEED				= 65,
-	CAN_PACKET_SET_LIMIT_POS				= 66,
-	CAN_PACKET_SET_SAMPLE_POINTS			= 67,
-	CAN_PACKET_SET_BRAKE_CURRENT			= 68,
-	CAN_PACKET_SET_CUSTOM_MODE				= 69,
-	CAN_PACKET_ALIVE						= 70,
-	CAN_PACKET_SET_RESET_SPEED				= 71,
-	CAN_PACKET_SET_RESET_POS_SAMPLE_POINTS	= 72,
-	CAN_PACKET_SET_TARGET_DUTY				= 73,
-	CAN_PACKET_SET_HOME			            = 75,
-	CAN_PACKET_HOMING			            = 76,
-#endif
 	CAN_PACKET_SET_POS_MULTITURN			= 74,
 
 	CAN_PACKET_GET_SUBAREA_PARA1			= 77,  //2.18.2024新增 分区PID参数读取和设置
@@ -1259,7 +1245,14 @@ typedef enum {
 	CAN_PACKET_SET_SUBAREA_PARA3			= 82,
 	CAN_PACKET_STORE_MC_CONFIGURATION		= 83,
 	CAN_PACKET_ENABLE_SUBAREA_PID	        = 84,
-
+//SHOOT 相关
+	CAN_PACKET_SET_ACCEL_CURRENT			= 63,
+	CAN_PACKET_SET_TARGET_SPEED				= 65,
+	CAN_PACKET_SET_BRAKE_CURRENT			= 68,
+	CAN_PACKET_SET_HOME			            = 75,
+	CAN_PACKET_HOMING			            = 76,
+	CAN_PACKET_SHOOT_SET_PTZ_ANGLE          = 64,
+	CAN_PACKET_SHOOT_GET_PTZ_ANGLE          = 66,
 	CAN_PACKET_ENABLE_SHOOT	                = 85,  //使能shoot
 	CAN_PACKET_EXCUTE_SHOOT	                = 86,  //执行shoot，开始加速
 	CAN_PACKET_ENABLE_AUTO_HOMING           = 87,  
