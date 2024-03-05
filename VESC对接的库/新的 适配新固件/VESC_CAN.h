@@ -2,7 +2,7 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-28 09:12:06
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2024-03-01 09:24:27
+ * @LastEditTime: 2024-03-05 18:57:50
  * @FilePath: \VESC_Code\VESC对接的库\新的 适配新固件\VESC_CAN.h
  * @Description: 
  * VESC_CAN 1.0 曹总写的库 回传有问题，发送和设置模式分开 10.28.2021
@@ -73,6 +73,9 @@ typedef enum {                              //VESC里定义的CAN数据包类型
 	CAN_PACKET_STORE_MC_CONFIGURATION		= 83,
 	CAN_PACKET_ENABLE_SUBAREA_PID	        = 84,
 	CAN_PACKET_SELFLOCK	                    = 85,
+	CAN_PACKET_SELFLOCK_RELEASE	            = 86,
+	CAN_PACKET_RELEASE_MOTER                = 94,
+	CAN_PACKET_SET_ZERO_POS                = 95,
 } CAN_PACKET_ID;
 
 typedef struct {                            // VESC回传信息           
@@ -130,6 +133,8 @@ bool VESC_SetCurrentBrake(float value, uint8_t id, CAN_HandleTypeDef *hcan);
 bool VESC_SetPos(float value, uint8_t id, CAN_HandleTypeDef *hcan);
 bool VESC_SetMultiturnPos(float value, uint8_t id, CAN_HandleTypeDef *hcan);
 bool VESC_SendCommand(CAN_PACKET_ID Cmd, float value, int32_t scale, uint8_t id, CAN_HandleTypeDef *hcan, uint32_t lenth);
+bool VESC_ReleaseMotor(uint8_t id, CAN_HandleTypeDef *hcan);
+bool VESC_SetZeroPosition(uint8_t id, CAN_HandleTypeDef *hcan);
 
 /******************************************分区PID控制部分函数开始*******************************************/
 bool VESC_ParamterRead(uint8_t id, CAN_HandleTypeDef *hcan);
@@ -146,7 +151,8 @@ bool VESC_EnableSubareaPIDControl(uint8_t id, CAN_HandleTypeDef *hcan, uint32_t 
 bool VESC_StoreMcConfiguration(uint8_t id, CAN_HandleTypeDef *hcan);
 /******************************************分区PID控制部分函数结束*******************************************/
 
-bool VESC_SelfLock(uint8_t id, CAN_HandleTypeDef *hcan, uint32_t flag);
+bool VESC_SelfLock(uint8_t id, CAN_HandleTypeDef *hcan);
+bool VESC_SelfLockRelease(uint8_t id, CAN_HandleTypeDef *hcan);
 
 static void VESC_Error_Handler(VESC_ErrorCode_t Code);
 

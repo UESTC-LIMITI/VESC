@@ -1223,7 +1223,7 @@ typedef enum {
 	CAN_PACKET_SELFLOCK	                    = 85,
 	CAN_PACKET_SELFLOCK_RELEASE	            = 86,
 	CAN_PACKET_RELEASE_MOTER                = 94,
-	CAN_PACKET_VECTOR_WHEEL_TEST            = 95,
+	CAN_PACKET_SET_ZERO_POS                = 95,
 	CAN_PACKET_MAKE_ENUM_32_BITS = 0xFFFFFFFF,
 } CAN_PACKET_ID;
 

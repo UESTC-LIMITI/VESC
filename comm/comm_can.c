@@ -1709,6 +1709,12 @@ static void decode_msg(uint32_t eid, uint8_t *data8, int len, bool is_replaced) 
 			timeout_reset();
 			break;
 
+		case CAN_PACKET_SET_ZERO_POS:
+			ind = 0;
+			mc_interface_update_pid_pos_offset(0, true);
+			timeout_reset();
+			break;
+
 /****************************************** custom 部分结束~~ ********************************************/
 
 

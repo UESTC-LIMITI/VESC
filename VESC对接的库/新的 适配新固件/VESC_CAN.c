@@ -2,7 +2,7 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-28 09:12:06
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2024-03-01 09:23:48
+ * @LastEditTime: 2024-03-05 18:58:34
  * @FilePath: \VESC_Code\VESC对接的库\新的 适配新固件\VESC_CAN.c
  * @Description: 
  * VESC_CAN 1.0 曹总写的库 回传有问题，发送和设置模式分开 10.28.2021
@@ -167,7 +167,7 @@ bool VESC_SetPos(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
 
 bool VESC_SetMultiturnPos(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
 	if(id > 255 || id <= 0) {
-		VESC_Error_Handler(Set_id_Wrong);
+		VESC_Error_Handler(Set_id_Wrong);                 //跑多圈
 	}
 	if(value > MAX_MULTITURN || value < -MAX_MULTITURN) {
 		VESC_Error_Handler(Multiturn_Overflow);
@@ -177,6 +177,26 @@ bool VESC_SetMultiturnPos(float value, uint8_t id, CAN_HandleTypeDef *hcan) {
 	for (int i = 3; i >= 0; i--)
 		VESC_Send_Buffer[i] = (temp >> ((3 - i) * 8)) & 0xff;
 	//send
+	VESC_CAN_SendData(hcan, id, eid, 4);
+	return true;
+}
+
+bool VESC_ReleaseMotor(uint8_t id, CAN_HandleTypeDef *hcan) {  //释放电机
+	if (id > 255 || id <= 0) {
+		VESC_Error_Handler(Set_id_Wrong);
+	}
+	uint32_t eid = (id & 0xff) | ((uint32_t)CAN_PACKET_RELEASE_MOTER << 8);
+	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
+	VESC_CAN_SendData(hcan, id, eid, 4);
+	return true;
+}
+
+bool VESC_SetZeroPosition(uint8_t id, CAN_HandleTypeDef *hcan) {  //设置零位置
+	if (id > 255 || id <= 0) {
+		VESC_Error_Handler(Set_id_Wrong);
+	}
+	uint32_t eid = (id & 0xff) | ((uint32_t)CAN_PACKET_SET_ZERO_POS << 8);
+	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
 	VESC_CAN_SendData(hcan, id, eid, 4);
 	return true;
 }
@@ -394,14 +414,22 @@ int32_t uchar2int32(uint8_t* buffer, int32_t *index) {
  * @param {uint32_t} flag 置1自锁，置0释放
  * @return {*}         处
  */
-bool VESC_SelfLock(uint8_t id, CAN_HandleTypeDef *hcan, uint32_t flag) {
+bool VESC_SelfLock(uint8_t id, CAN_HandleTypeDef *hcan) {
 	if (id > 255 || id <= 0) {
 		VESC_Error_Handler(Set_id_Wrong);
 	}
-	int32_t ind = 0;
 	uint32_t eid = (id & 0xff) | ((uint32_t)CAN_PACKET_SELFLOCK << 8);
 	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
-	buffer_append_uint32(VESC_Send_Buffer, flag, &ind);
+	VESC_CAN_SendData(hcan, id, eid, 4);
+	return true;
+}
+
+bool VESC_SelfLockRelease(uint8_t id, CAN_HandleTypeDef *hcan) {
+	if (id > 255 || id <= 0) {
+		VESC_Error_Handler(Set_id_Wrong);
+	}
+	uint32_t eid = (id & 0xff) | ((uint32_t)CAN_PACKET_SELFLOCK_RELEASE << 8);
+	memset(VESC_Send_Buffer, 0, BUFFER_MAX_LENTH);
 	VESC_CAN_SendData(hcan, id, eid, 4);
 	return true;
 }
