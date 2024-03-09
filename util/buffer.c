@@ -250,10 +250,19 @@ double buffer_get_float64_auto(const uint8_t *buffer, int32_t *index) {
 }
 
 void buffer_append_float32_direct (uint8_t* buffer, float num, int32_t* index) {
-	float souece = num;
-	uint32_t des = 0;
-	memcpy(&des, &souece, 4);
-	buffer_append_uint32(buffer, des, index);
+	float source = num;
+	memcpy((buffer+(*index)), &source, 4);
+	*index += 4;
 }
 
-
+float buffer_get_float32_direct (uint8_t* buffer, int32_t* index) {
+	uint32_t src = 0;
+	float ret = 0;
+	src = ((uint32_t)buffer[(*index) + 0] << 24) |
+		  ((uint32_t)buffer[(*index) + 1] << 16) |
+		  ((uint32_t)buffer[(*index) + 2] << 8)  |
+		  ((uint32_t)buffer[(*index) + 3] << 0)  ;
+	memcpy (&ret, &src, 4);
+	*index += 4;
+	return ret;
+}

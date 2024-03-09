@@ -3548,7 +3548,6 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 	m_isr_motor = 0;
 	m_last_adc_isr_duration = timer_seconds_elapsed_since(t_start);
 	
-	mc_interface_selflock();
 }
 
 // Private functions
@@ -4091,6 +4090,8 @@ static THD_FUNCTION(pid_thread, arg) {
 		foc_run_pid_control_pos(encoder_index_found(), dt, (motor_all_state_t*)&m_motor_1);
 		foc_run_pid_control_speed(dt, (motor_all_state_t*)&m_motor_1);
 		foc_run_pid_control_pos_multiturn(encoder_index_found(), dt, (motor_all_state_t*)&m_motor_1);
+		mc_interface_selflock();
+
 #ifdef HW_HAS_DUAL_MOTORS
 		foc_run_pid_control_pos(encoder_index_found(), dt, (motor_all_state_t*)&m_motor_2);
 		foc_run_pid_control_speed(dt, (motor_all_state_t*)&m_motor_2);
