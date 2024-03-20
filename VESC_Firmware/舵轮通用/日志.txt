@@ -1,0 +1,2 @@
+3.16.2024 v1.1相比v1.0改动的mc_interface_selflock的位置，从PIDloop里改到adc_handler里
+3.20.2024 v1.2 新增多圈位置的回传经过一个均值滤波器

@@ -151,6 +151,7 @@ extern volatile float ADC_curr_norm_value[];
  */
 /**************************************************************************************************/
 float mc_interface_get_pos_multiturn(void);
+float mc_interface_get_pos_multiturn_filtered (void);
 void mc_interface_set_pid_pos_multiturn(float pos);
 bool mc_interface_get_subarea_PID_parameter(uint8_t index, uint8_t* buffer);
 bool mc_interface_set_subarea_PID_parameter1 (uint8_t* buffer);

@@ -72,5 +72,8 @@ void encoder_tim_isr(void);
 //自己加的编码器多圈计算，在routine里跑自动计算多圈
 void encoder_multiturn_calc(void);
 float encoder_get_multiturn(void);
+//因为as5047数据有点抖，回传均值滤波之后的数据
+void encoder_send_back_mean_filter (float now_pos);
+float encoder_get_multiturn_filtered (void);
 
 #endif /* ENCODER_ENCODER_H_ */

@@ -3232,4 +3232,12 @@ bool mc_interface_selflock (void) {
 	return true;
 }
 
+/**
+ * @description: 回传均值滤波以后的多圈角度
+ * @param {return} encoder_get_multiturn_filtered
+ * @return {*}
+ */
+float mc_interface_get_pos_multiturn_filtered (void) {
+	return encoder_get_multiturn_filtered();
+}
 /**************************************************************************************************/

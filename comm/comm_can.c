@@ -1200,7 +1200,7 @@ void comm_can_send_status2(uint8_t id, bool replace) {
 	custom_append_float(buffer, (float)encoder_get_multiturn(), &send_index);
 #else
 	buffer_append_int32(buffer, (int32_t)(mc_interface_get_pid_pos_now() * 1e6), &send_index);
-	buffer_append_int32(buffer, (int32_t)(encoder_get_multiturn() * 1e3), &send_index);
+	buffer_append_int32(buffer, (int32_t)(mc_interface_get_pos_multiturn_filtered() * 1e3), &send_index);
 #endif
 	comm_can_transmit_eid_replace(id | ((uint32_t)CAN_PACKET_STATUS_2 << 8),
 			buffer, send_index, replace, 0);

@@ -36,7 +36,8 @@
 int mul_pos_base = 0;
 float mul_pos = 0;
 float pos_temp = 0;
-float pos_temp_pre = 0;
+float pos_temp_pre = 180;  //180是因为防止上电 pre = 0 但是 now > 270 导致的base多减一圈
+float filter_sum = 0;
 
 extern int mul_pos_base;
 extern float mul_pos;
@@ -106,7 +107,7 @@ bool encoder_init(volatile mc_configuration *conf) {  //编码器初始化函数
 		}
 
 		m_encoder_type_now = ENCODER_TYPE_AS504x;
-		timer_start(routine_rate_10k);  //5047好像是占用一个线程的？
+		timer_start(routine_rate_10k);  //5047好像是占用一个线程的？  10k刷新率，好高
 
 		res = true;
 	} break;
@@ -941,6 +942,7 @@ static THD_FUNCTION(routine_thread, arg) {    //开了一个线程，自动执�
 		}
 
 		encoder_multiturn_calc();
+		encoder_send_back_mean_filter(mul_pos);
 
 		switch (m_routine_rate) {
 		case routine_rate_1k: chThdSleep(CH_CFG_ST_FREQUENCY / 1000); break;
@@ -981,6 +983,27 @@ float encoder_get_multiturn(void) {
 		return 0;
 	} else {
 		return mul_pos;
+	}
+}
+
+#define ENCODER_SEND_BACK_FILTER_WINDOW 10
+//多圈数据均值滤波
+void encoder_send_back_mean_filter (float now_pos) {
+	static float window[10];
+	static int index;
+	filter_sum -= window[index];
+	filter_sum += now_pos;
+	window[index++] = now_pos;
+	if (index >= ENCODER_SEND_BACK_FILTER_WINDOW) {
+		index = 0;
+	}
+}
+//回传经过均值滤波之后的多圈
+float encoder_get_multiturn_filtered (void) {
+	if (m_encoder_type_now == ENCODER_TYPE_NONE) {
+		return 0;
+	} else {
+		return filter_sum / ENCODER_SEND_BACK_FILTER_WINDOW;
 	}
 }
 /**************************************************************************************************/
