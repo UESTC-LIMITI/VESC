@@ -3204,6 +3204,7 @@ bool mc_interface_selflock (void) {
 				self_lock_start = false;
 				*status = SELF_LOCK_RECODE_POS;
 			}
+			timeout_reset();
 			return false;
 			break;
 
@@ -3213,6 +3214,7 @@ bool mc_interface_selflock (void) {
 				self_lock_pos = mc_interface_get_pos_multiturn();
 				*status = SELF_LOCK_LOCKING;
 			}
+			timeout_reset();
 			break;
 
 		case SELF_LOCK_LOCKING:
@@ -3222,13 +3224,16 @@ bool mc_interface_selflock (void) {
 				mc_interface_release_motor();
 				*status = SELF_LOCK_OVER;
 			}
+			timeout_reset();
 			break;
 
 		case SELF_LOCK_OVER:
 			self_lock_pos_recorded = false;
 			*status = SELF_LOCK_DISABLE;
+			timeout_reset();
 			break;
 	}
+	
 	return true;
 }
 

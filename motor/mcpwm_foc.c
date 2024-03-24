@@ -4091,7 +4091,7 @@ static THD_FUNCTION(pid_thread, arg) {
 		foc_run_pid_control_pos(encoder_index_found(), dt, (motor_all_state_t*)&m_motor_1);
 		foc_run_pid_control_speed(dt, (motor_all_state_t*)&m_motor_1);
 		foc_run_pid_control_pos_multiturn(encoder_index_found(), dt, (motor_all_state_t*)&m_motor_1);
-		mc_interface_selflock();
+		// mc_interface_selflock();
 
 #ifdef HW_HAS_DUAL_MOTORS
 		foc_run_pid_control_pos(encoder_index_found(), dt, (motor_all_state_t*)&m_motor_2);
