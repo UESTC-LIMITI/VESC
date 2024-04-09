@@ -31,7 +31,7 @@
 #define __HW_60_LIMITI_MK2_H__
 
 #define HW_IS_LIMITI_MK2
-#define DISABLE_HW_LIMITS
+//#define DISABLE_HW_LIMITS
 #define USE_CUSTOM_ENCODER1
 #define SHOOT_TEST
 

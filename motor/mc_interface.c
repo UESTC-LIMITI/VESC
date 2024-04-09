@@ -3245,4 +3245,60 @@ bool mc_interface_selflock (void) {
 float mc_interface_get_pos_multiturn_filtered (void) {
 	return encoder_get_multiturn_filtered();
 }
+
+/**
+ * 4.9 新增过流自动死球 现在判断标准是占空比,高占空比持续两秒自动死球
+ */
+typedef enum {
+	OC_STATUS_NONE,
+	OC_STATUS_OC_HAPPEND,
+	OC_STATUS_OC_TIMEOUT,
+} OVER_CURRENT_STATUS;  //状态枚举体
+
+float oc_duty_cycle_scale = 0.90f;  //暂时不可改
+
+void mc_interface_max_current_detect (void) {  //状态机 目前打算放在adc_int_handler里
+	static float max_current_elaspe_time;
+	static int32_t max_current_start_time;
+	static OVER_CURRENT_STATUS STATUS = OC_STATUS_NONE; 
+
+	mc_configuration* conf = &(m_motor_1.m_conf);
+
+	switch (STATUS) {
+		case OC_STATUS_NONE:
+			if (mc_interface_get_duty_cycle_now() >= oc_duty_cycle_scale || mc_interface_get_duty_cycle_set() >= oc_duty_cycle_scale) {
+				max_current_start_time = timer_time_now();
+				STATUS = OC_STATUS_OC_HAPPEND;
+			}
+			else {
+				max_current_elaspe_time = 0;
+				max_current_start_time = 0;
+				return;
+			}
+			break;
+
+		case OC_STATUS_OC_HAPPEND:
+			max_current_elaspe_time = timer_seconds_elapsed_since(max_current_start_time);
+			if (max_current_elaspe_time > 100.0f) {  //遇到计时器跳变这种小概率事件，重置计时
+				max_current_start_time = timer_time_now();
+				max_current_elaspe_time = timer_seconds_elapsed_since(max_current_start_time);
+			}
+			if (max_current_elaspe_time >= 2.0f) {
+				max_current_elaspe_time = 0;
+				max_current_start_time = 0;
+				STATUS = OC_STATUS_OC_TIMEOUT;
+			}
+			else if (mc_interface_get_duty_cycle_now() < (oc_duty_cycle_scale * 0.8f) && mc_interface_get_duty_cycle_set() <= (oc_duty_cycle_scale * 0.8f)) {
+					//类似施密特触发器的判断
+				STATUS = OC_STATUS_NONE;
+			}
+			break;
+
+
+		case OC_STATUS_OC_TIMEOUT:
+			mc_interface_fault_stop(FAULT_CODE_HIGH_CURRENT_TIMEOUT, false, true); //自定义fault 一直发直到被reset
+			break;
+	}
+}
+
 /**************************************************************************************************/

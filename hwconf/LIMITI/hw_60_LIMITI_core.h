@@ -389,7 +389,7 @@
 #define HW_LIM_ERPM				-200e3, 200e3
 #define HW_LIM_DUTY_MIN			0.0, 0.1
 #define HW_LIM_DUTY_MAX			0.0, 0.99     //占空比限制在 0.1 ~ 0.99 不在范围内都没法转？
-#define HW_LIM_TEMP_FET			-40.0, 110.0  //mos温控，林哥版本上有没有呢？
+#define HW_LIM_TEMP_FET			-40.0, 80.0  //mos温控，林哥版本上有没有呢？
 
 
 #endif /* HW_60_CORE_H_ */

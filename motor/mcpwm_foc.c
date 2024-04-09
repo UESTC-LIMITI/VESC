@@ -2737,6 +2737,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 	bool skip_interpolation = motor_other->m_cc_was_hfi;
 
 	mc_interface_selflock();
+
+	mc_interface_max_current_detect();
 	// Update modulation for V7 and collect current samples. This is used by the HFI.
 	if (motor_other->m_duty_next_set) {
 		motor_other->m_duty_next_set = false;

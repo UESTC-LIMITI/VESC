@@ -161,6 +161,8 @@ bool mc_interface_store_mc_configuration (bool is_motor_2);
 bool mc_interface_subarea_PID_control_enable (uint32_t flag);
 
 bool mc_interface_selflock (void);
+
+void mc_interface_max_current_detect (void);
 /**************************************************************************************************/
 extern bool self_lock_start ;
 extern bool self_lock_end;
