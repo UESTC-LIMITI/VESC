@@ -162,6 +162,7 @@ bool mc_interface_subarea_PID_control_enable (uint32_t flag);
 
 bool mc_interface_selflock (void);
 
+#define STALLING_DETECT  //堵转检测开启状态
 void mc_interface_max_current_detect (void);
 /**************************************************************************************************/
 extern bool self_lock_start ;

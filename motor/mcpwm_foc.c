@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #define HW_HAS_3_SHUNTS
-#define HW_HAS_PHASE_SHUNTS  //临时加的
+// #define HW_HAS_PHASE_SHUNTS  //临时加的
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -2738,7 +2738,10 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 
 	mc_interface_selflock();
 
+#if defined  STALLING_DETECT
 	mc_interface_max_current_detect();
+#endif
+
 	// Update modulation for V7 and collect current samples. This is used by the HFI.
 	if (motor_other->m_duty_next_set) {
 		motor_other->m_duty_next_set = false;

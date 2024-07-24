@@ -35,6 +35,7 @@
 
 int mul_pos_base = 0;
 float mul_pos = 0;
+float mul_pos_last = 0;
 float pos_temp = 0;
 float pos_temp_pre = 180;  //180是因为防止上电 pre = 0 但是 now > 270 导致的base多减一圈
 float filter_sum = 0;
@@ -970,12 +971,17 @@ static void timer_start(routine_rate_t rate) {
 /**************************************************************************************************/
 void encoder_multiturn_calc(void) {
 	pos_temp = mc_interface_get_pid_pos_now();
-	if (pos_temp > 270 && pos_temp_pre < 90)
+	if (pos_temp > 359 && pos_temp_pre < 1)
 		mul_pos_base -= 360;
-	else if (pos_temp < 90 && pos_temp_pre > 270)
+	else if (pos_temp < 1 && pos_temp_pre > 359)
 		mul_pos_base += 360;
 	pos_temp_pre = pos_temp;
 	mul_pos = mul_pos_base + pos_temp;
+	if (mul_pos - mul_pos_last > 1.0f) {
+		mul_pos = mul_pos_last;
+	} else {
+		mul_pos_last = mul_pos;
+	}
 }
 
 float encoder_get_multiturn(void) {
