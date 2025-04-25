@@ -262,6 +262,8 @@ static void timer_reinit(int f_zv) {
 
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
 
+	// TIM2配置为PWM输出, 三个PWM输出对应电机驱动芯片的三个PWM输入
+	// foc计算采用TIM2的中断信号就是为了保证每一个PWM周期都能触发ADC采样, 都能计算一次
 	TIM_TimeBaseStructure.TIM_Prescaler = 0;
 	TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
 	TIM_TimeBaseStructure.TIM_Period = 0xFFFF;
@@ -287,7 +289,9 @@ static void timer_reinit(int f_zv) {
 	TIM_CCPreloadControl(TIM2, ENABLE);
 
 	// PWM outputs have to be enabled in order to trigger ADC on CCx
-	TIM_CtrlPWMOutputs(TIM2, ENABLE);
+	TIM_CtrlPWMOutputs(TIM2, ENABLE); 
+	// 一开始就使能TIM2的PWM输出, 虽然没有必要一开始就计算foc和输出PWM, 
+	// 但是因为TIM2的CCx输出是ADC的触发源, 为了保证ADC一直采样, 需要提前使能
 
 #if defined HW_HAS_DUAL_MOTORS || defined HW_HAS_DUAL_PARALLEL
 	// See: https://www.cnblogs.com/shangdawei/p/4758988.html
@@ -393,7 +397,7 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 	virtual_motor_init(conf_m1);
 
 	TIM_DeInit(TIM1);
-	TIM_DeInit(TIM2);
+	TIM_DeInit(TIM2);  // foc初始化过程中要关闭各个定时器, 特别是TIM2, 里面有foc计算的内容
 	TIM_DeInit(TIM8);
 
 	TIM1->CNT = 0;
@@ -413,8 +417,7 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 					  (void *)0);
 
 	DMA_InitStructure.DMA_Channel = DMA_Channel_0;
-	DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)&ADC_Value;
-	DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&ADC->CDR;
+	DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)&ADC_Value; //在foc初始化时确定DMA的内存地址
 	DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralToMemory;
 	DMA_InitStructure.DMA_BufferSize = HW_ADC_CHANNELS;
 	DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
@@ -429,7 +432,7 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 	DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
 	DMA_Init(DMA2_Stream4, &DMA_InitStructure);
 
-	DMA_Cmd(DMA2_Stream4, ENABLE);
+	DMA_Cmd(DMA2_Stream4, ENABLE);  //使能DMA2的4号通道，从现在启动DMA2的4号通道
 
 	// Note: The half transfer interrupt is used as we already have all current and voltage
 	// samples by then and we can start processing them. Entering the interrupt earlier gives
@@ -443,7 +446,8 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 
 	// Note that the ADC is running at 42MHz, which is higher than the
 	// specified 36MHz in the data sheet, but it works.
-	ADC_CommonInitStructure.ADC_Mode = ADC_TripleMode_RegSimult;
+	ADC_CommonInitStructure.ADC_Mode = ADC_TripleMode_RegSimult;  
+	//ADC三重模式，两个从ADC，一个主ADC，主ADC外部触发时, 通过硬件同步, 从ADC自动触发. 保证三个ADC同时采样
 	ADC_CommonInitStructure.ADC_Prescaler = ADC_Prescaler_Div2;
 	ADC_CommonInitStructure.ADC_DMAAccessMode = ADC_DMAAccessMode_1;
 	ADC_CommonInitStructure.ADC_TwoSamplingDelay = ADC_TwoSamplingDelay_5Cycles;
@@ -452,15 +456,15 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 	ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
 	ADC_InitStructure.ADC_ScanConvMode = ENABLE;
 	ADC_InitStructure.ADC_ContinuousConvMode = DISABLE;
-	ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Falling;
-	ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T2_CC2;
+	ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Falling;  // 主ADC外部触发是在下降沿
+	ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T2_CC2;  // 主ADC外部触发是TIM2的CC2通道
 	ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
 	ADC_InitStructure.ADC_NbrOfConversion = HW_ADC_NBR_CONV;
 
-	ADC_Init(ADC1, &ADC_InitStructure);
+	ADC_Init(ADC1, &ADC_InitStructure);  // ADC1使用以上配置初始化是主ADC
 	ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
-	ADC_InitStructure.ADC_ExternalTrigConv = 0;
-	ADC_Init(ADC2, &ADC_InitStructure);
+	ADC_InitStructure.ADC_ExternalTrigConv = 0;  // 从ADC禁用外部触发
+	ADC_Init(ADC2, &ADC_InitStructure);  // ADC2和ADC3是从ADC
 	ADC_Init(ADC3, &ADC_InitStructure);
 
 	ADC_TempSensorVrefintCmd(ENABLE);
@@ -468,7 +472,7 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 
 	hw_setup_adc_channels();
 
-	ADC_Cmd(ADC1, ENABLE);
+	ADC_Cmd(ADC1, ENABLE);  //启动三路的采样
 	ADC_Cmd(ADC2, ENABLE);
 	ADC_Cmd(ADC3, ENABLE);
 
@@ -481,10 +485,10 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 
 	utils_sys_unlock_cnt();
 
-	CURRENT_FILTER_ON();
+	CURRENT_FILTER_ON();  // 目前是空的宏定义
 	CURRENT_FILTER_ON_M2();
-	ENABLE_GATE();
-	DCCAL_OFF();
+	ENABLE_GATE();  // 目前是空的宏定义
+	DCCAL_OFF();  // 目前是空的宏定义
 #ifdef HW_USE_ALTERNATIVE_DC_CAL
 	m_dccal_done = true;
 #else
@@ -493,10 +497,11 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 		float cal_start_timeout = 10.0;
 
 		// Wait for input voltage to rise above minimum voltage
+		// 初始化还要检查输入电压
 		while (mc_interface_get_input_voltage_filtered() < m_motor_1.m_conf->l_min_vin) {
 			chThdSleepMilliseconds(1);
 			if (UTILS_AGE_S(cal_start_time) >= cal_start_timeout) {
-				m_dccal_done = true;
+				m_dccal_done = true;  // 超时了就置位, 除了接下来的初始化不再进行, 这个标志位还会影响什么?
 				break;
 			}
 		}
@@ -504,24 +509,28 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 		// Wait for input voltage to settle
 		if (!m_dccal_done) {
 			float v_in_last = mc_interface_get_input_voltage_filtered();
-			systime_t v_in_stable_time = chVTGetSystemTimeX();
-			while (UTILS_AGE_S(v_in_stable_time) < 2.0) {
+			systime_t v_in_stable_time = chVTGetSystemTimeX();  // 获取当前时刻
+			while (UTILS_AGE_S(v_in_stable_time) < 2.0) {  
+				// 计算稳定的时间大于2s才进行下一步, 一定程度上解释为什么VESC开机需要一些时间
+				// UTILS_AGE_S(x) 这个宏定义的作用时计算自从x时刻到现在的时间, 返回的是秒数
+				
 				chThdSleepMilliseconds(1);
 
 				float v_in_now = mc_interface_get_input_voltage_filtered();
 				if (fabsf(v_in_now - v_in_last) > 1.5) {
 					v_in_last = v_in_now;
-					v_in_stable_time = chVTGetSystemTimeX();
+					v_in_stable_time = chVTGetSystemTimeX();  // 电源电压不稳定, 更新当前时刻
 				}
 
 				if (UTILS_AGE_S(cal_start_time) >= cal_start_timeout) {
-					m_dccal_done = true;
+					m_dccal_done = true;  // 超时咯, 拜拜
 					break;
 				}
 			}
 		}
 
 		// Wait for fault codes to go away
+		// 等待一段时间处理故障代码, 别的线程会处理, 如果一直没有消除错误, 那应该是没法正常运行了
 		if (!m_dccal_done) {
 			while (mc_interface_get_fault() != FAULT_CODE_NONE) {
 				chThdSleepMilliseconds(1);
@@ -566,6 +575,7 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 	}
 #endif
 	// Start threads
+	// 这三个线程中没有实质上与foc控制有关的代码, 例如svpwm计算, park变换, clark变换
 	timer_thd_stop = false;
 	chThdCreateStatic(timer_thread_wa, sizeof(timer_thread_wa), NORMALPRIO, timer_thread, NULL);
 
@@ -578,6 +588,8 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 	// Check if the system has resumed from IWDG reset and generate fault if it has. This can be used to
 	// tell if some frozen thread caused a watchdog reset. Note that this also will trigger after running
 	// the bootloader and after the reset command.
+	// 看门狗错误是这里产生的, 为何一直没法消除掉?
+	// 这个错误是因为看门狗一直没有被喂, 可能是某个线程卡死了, 也可能是bootloader的原因
 	if (timeout_had_IWDG_reset()) {
 		mc_interface_fault_stop(FAULT_CODE_BOOTING_FROM_WATCHDOG_RESET, false, false);
 	}
@@ -3602,7 +3614,7 @@ static void timer_update(motor_all_state_t *motor, float dt) {
 	utils_sys_unlock_cnt();
 
 	// Use this to study the openloop timers under experiment plot
-#if 0
+#if 0 //画图用的？
 	{
 		static bool plot_started = false;
 		static int plot_div = 0;
@@ -3782,8 +3794,9 @@ static void timer_update(motor_all_state_t *motor, float dt) {
 	// 4.0 scaling is kind of arbitrary, but it should make configs from old VESC Tools more likely to work.
 	motor->m_gamma_now = gamma_tmp * 4.0;
 
+	//以下又是一个observer, 电阻观测器
 	// Run resistance observer
-	// See "An adaptive flux observer for the permanent magnet synchronous motor"
+	// See "An adaptive flux observer for the permanent magnet synchronous motor" 
 	// https://doi.org/10.1002/acs.2587
 	{
 		float res_est_gain = 0.00002;

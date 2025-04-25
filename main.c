@@ -148,7 +148,7 @@ static THD_FUNCTION(led_thread, arg) {
 	}
 }
 
-static THD_FUNCTION(periodic_thread, arg) {   //周期更新数据，各种数据（包含编码器）
+static THD_FUNCTION(periodic_thread, arg) {   //周期更新数据，各种数据（包含编码器） 疑似是往上位机发送数据的线程
 	(void)arg;
 
 	chRegSetThreadName("Main periodic");

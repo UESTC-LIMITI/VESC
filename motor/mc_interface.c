@@ -194,7 +194,7 @@ void mc_interface_init(void) {   //上位机与下位机交互的init？
 	chThdCreateStatic(stat_thread_wa, sizeof(stat_thread_wa), NORMALPRIO, stat_thread, NULL);
 
 	int motor_old = mc_interface_get_motor_thread();
-	mc_interface_select_motor_thread(1);
+	mc_interface_select_motor_thread(1); // 多电机模式下才有作用
 #ifdef HW_HAS_DRV8301
 	drv8301_set_oc_mode(motor_now()->m_conf.m_drv8301_oc_mode);
 	drv8301_set_oc_adj(motor_now()->m_conf.m_drv8301_oc_adj);

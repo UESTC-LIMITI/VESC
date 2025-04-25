@@ -61,7 +61,9 @@ CH_IRQ_HANDLER(HW_ENC_TIM_ISR_VEC) {
 	}
 }
 
-CH_IRQ_HANDLER(TIM2_IRQHandler) {  //mcpwm专用定时器IRQ
+CH_IRQ_HANDLER(TIM2_IRQHandler) {  //mcpwm专用定时器IRQ 
+	// 2025.4.25 更新一下, 一开始的注释是很早就写下的, 那个时候理解不全面. 
+	// 这个TIM2不是foc的专门定时器, 是输出PWM的, 只不过利用PWM输出的周期进行采样和foc计算.
 	if (TIM_GetITStatus(TIM2, TIM_IT_CC2) != RESET) {
 		mcpwm_foc_tim_sample_int_handler();
 
