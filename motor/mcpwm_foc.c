@@ -2,8 +2,8 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-25 20:23:49
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2025-05-15 17:15:35
- * @FilePath: \VESC_Code\motor\mcpwm_foc.c
+ * @LastEditTime: 2025-05-15 23:14:17
+ * @FilePath: \VESC\motor\mcpwm_foc.c
  * @Description: 
  * 
  * Copyright (c) 2025 by xiayuan, All Rights Reserved. 
@@ -3257,7 +3257,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 							motor_now->m_phase_now_encoder,
 							motor_now->m_speed_est_fast,
 							conf_now->foc_sl_erpm,
-							motor_now);
+							motor_now);  // 即使是使用编码器, observer也会运行, 将obsever的值和encoder的值做融合
 				} else {
 					// Rotate the motor in open loop if the index isn't found.
 					motor_now->m_motor_state.phase = motor_now->m_phase_now_encoder_no_index; //编码器失效，开环跑
@@ -3276,15 +3276,20 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 				}
 				break;
 			case FOC_SENSOR_MODE_SENSORLESS:
-				if (motor_now->m_phase_observer_override) {
+				if (motor_now->m_phase_observer_override) {  
+					// 无感, observer复写开启, 似乎不是使用observer计算的本来的相位
+					// 有时observer的相位需要略微调整才是准确的, 例如电机有速度的时候, 
+					// 会用转速*dt来补偿相位, 补偿后的值储存在override中.
+					// 电机0速的时候才不用override.
 					motor_now->m_motor_state.phase = motor_now->m_phase_now_observer_override;
 					motor_now->m_observer_state.x1 = motor_now->m_observer_x1_override;
 					motor_now->m_observer_state.x2 = motor_now->m_observer_x2_override;
 					iq_set_tmp += conf_now->foc_sl_openloop_boost_q * SIGN(iq_set_tmp);
+					// 这个boost_q的默认值是0, 而且没有任何地方修改这个值.
 					if (conf_now->foc_sl_openloop_max_q > conf_now->cc_min_current) {
 						utils_truncate_number_abs(&iq_set_tmp, conf_now->foc_sl_openloop_max_q);
 					}
-				} else {
+				} else {  // 直接使用observer计算的相位
 					motor_now->m_motor_state.phase = motor_now->m_phase_now_observer;
 				}
 
@@ -3293,7 +3298,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 				}
 				break;
 
-			case FOC_SENSOR_MODE_HFI_START:
+			case FOC_SENSOR_MODE_HFI_START:  // START就是把数值清零吗
 				motor_now->m_motor_state.phase = motor_now->m_phase_now_observer;
 
 				if (motor_now->m_phase_observer_override) {
@@ -3325,7 +3330,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 					motor_now->m_hfi.angle = motor_now->m_phase_now_observer;
 					motor_now->m_hfi.double_integrator = -motor_now->m_speed_est_fast;
 				}
-
+				// 下面这个函数, 把hfi的相位当作encoder来和observer的相位做融合.
 				motor_now->m_motor_state.phase = foc_correct_encoder(
 						motor_now->m_phase_now_observer,
 						motor_now->m_hfi.angle,
@@ -3338,6 +3343,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 				}
 				break;
 			}  //根据不同的encoder选择不同的参数设置，结束
+			// 相位的计算结束, 总体分为四部分: 编码器/霍尔传感器/无感/高频注入
 
 			if (motor_now->m_control_mode == CONTROL_MODE_HANDBRAKE) {  //根据不同的控制模式选择相位的计算方式，开始
 				// Force the phase to 0 in handbrake mode so that the current simply locks the rotor.
@@ -3814,11 +3820,13 @@ static void timer_update(motor_all_state_t *motor, float dt) {
 	}
 
 	if (motor->m_min_rpm_timer > 0.0) {
-		motor->m_phase_now_observer_override += add_min_speed;
+		motor->m_phase_now_observer_override += add_min_speed;  
+		// 对observer的相位进行补偿, 这个add_min_speed是根据电机的转速来计算的
+		// add_min_speed = rpm * dt
 
 		// When the motor gets stuck it tends to be 90 degrees off, so start the open loop
 		// sequence by correcting with 60 degrees.
-		if (started_now) {
+		if (started_now) {  // 这是什么补偿?
 			if (motor->m_motor_state.duty_now > 0.0) {
 				motor->m_phase_now_observer_override += M_PI / 3.0;
 			} else {

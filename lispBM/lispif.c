@@ -85,6 +85,8 @@ void lispif_init(void) {
 	// was the cause of it.
 	// TODO: Anything else to check?
 	if (!timeout_had_IWDG_reset() && terminal_get_first_fault() != FAULT_CODE_BOOTING_FROM_WATCHDOG_RESET) {
+		// lispBM初始化, restart函数会开启线程, 
+		// 线程会执行 event_process 函数的上层, 进而开始处理事件
 		lispif_restart(false, true);
 	}
 

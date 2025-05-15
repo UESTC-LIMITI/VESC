@@ -5013,6 +5013,12 @@ void lispif_load_vesc_extensions(void) {
 	lbm_string_extensions_init();
 }
 
+// lisp对CAN消息的处理函数. 
+// 问题: lisp为什么要处理CAN消息? 如果是通过lisp与上位机vesc tool交互, 
+// 那么它们之间一般不会有CAN消息的交互.
+// 这个函数在comm_can.c中被调用, 但是在lispif.c中并没有被调用,
+// 总线上的CAN消息可以用lisp处理, 说明lisp不只是与上位机交互时用到, 
+// 还可以一定程度上接手本来由C语言控制的外设.
 void lispif_process_can(uint32_t can_id, uint8_t *data8, int len, bool is_ext) {
 	if (is_ext) {
 		if (can_recv_eid_cid < 0 && !event_can_eid_en)  {
@@ -5029,10 +5035,10 @@ void lispif_process_can(uint32_t can_id, uint8_t *data8, int len, bool is_ext) {
 		f_cons(&v);  // 插入一个cons, cons是一个pair, 这里用来表示一个pair的开始
 
 		if ((can_recv_sid_cid < 0 && !is_ext) || (can_recv_eid_cid < 0 && is_ext)) {
-			f_sym(&v, is_ext ? sym_event_can_eid : sym_event_can_sid);
-			f_cons(&v);
+			f_sym(&v, is_ext ? sym_event_can_eid : sym_event_can_sid);  // 标识CANid的类型
+			f_cons(&v);  // 插入一个cons, CANid类型为什么要与其他信息分开呢?
 			f_i32(&v, can_id);
-			f_lbm_array(&v, len, data8);
+			f_lbm_array(&v, len, data8);  // 插入can_id和数据
 		} else {
 			f_i32(&v, can_id);
 			f_cons(&v);
@@ -5040,8 +5046,9 @@ void lispif_process_can(uint32_t can_id, uint8_t *data8, int len, bool is_ext) {
 			f_sym(&v, ENC_SYM_NIL);
 		}
 
-		lbm_finish_flatten(&v);
+		lbm_finish_flatten(&v);  // 完成flatten, 这里会将数据压缩成一个连续的内存块
 
+		// 接下来基本都是将接收到的数据作为event传递给lisp的过程
 		if (can_recv_sid_cid >= 0 && !is_ext) {
 			if (!lbm_unblock_ctx(can_recv_sid_cid, &v)) {
 				lbm_free(v.buf);
