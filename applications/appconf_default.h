@@ -1,4 +1,12 @@
 /*
+ * @Date: 2025-04-28 01:04:36
+ * @LastEditors: xiayuan 1137542776@qq.com
+ * @LastEditTime: 2025-04-28 01:06:04
+ * @FilePath: \VESC\applications\appconf_default.h
+ * @Description:默认app设置的宏定义, 恢复默认设置的时候, 各个参数从宏定义中获取, 
+ * 所以有些app设置, 例如can的波特率, 是可以提前在这里改掉的
+ */
+/*
 	Copyright 2016 Benjamin Vedder	benjamin@vedder.se
 
 	This file is part of the VESC firmware.

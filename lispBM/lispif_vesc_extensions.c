@@ -5026,7 +5026,7 @@ void lispif_process_can(uint32_t can_id, uint8_t *data8, int len, bool is_ext) {
 
 	lbm_flat_value_t v;
 	if (lbm_start_flatten(&v, 50 + len)) {
-		f_cons(&v);
+		f_cons(&v);  // 插入一个cons, cons是一个pair, 这里用来表示一个pair的开始
 
 		if ((can_recv_sid_cid < 0 && !is_ext) || (can_recv_eid_cid < 0 && is_ext)) {
 			f_sym(&v, is_ext ? sym_event_can_eid : sym_event_can_sid);

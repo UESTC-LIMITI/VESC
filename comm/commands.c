@@ -183,6 +183,9 @@ static void send_func_dummy(unsigned char *data, unsigned int len) {
 	(void)data; (void)len;
 }
 
+// 以下代码没有涉及CAN消息处理, 这里把USB和NRF51的处理代码放在一起了
+// 还有画图的(plot), BMS, LISP, 等等
+// 更正一下, 按理来说USB的消息处理会放在这里, 但是我仍然没有找到??
 /**
  * Process a received buffer with commands and data.
  *
@@ -1948,6 +1951,9 @@ int commands_get_fw_version_sent_cnt(void) {
 	return fw_version_sent_cnt;
 }
 
+// 这个函数处理某种类型的数据包, 上电开始就启动, 一直读取某个地址内的数据包进行处理, 
+// 也就是说如果想要这个函数处理某个数据包, 就将内容填入这个地址中.
+// 问题: 什么类型的数据包?
 static THD_FUNCTION(blocking_thread, arg) {
 	(void)arg;
 
