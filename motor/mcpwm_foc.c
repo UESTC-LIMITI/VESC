@@ -1,4 +1,14 @@
 /*
+ * @Author: xiayuan 1137542776@qq.com
+ * @Date: 2024-01-25 20:23:49
+ * @LastEditors: xiayuan 1137542776@qq.com
+ * @LastEditTime: 2025-05-15 17:15:35
+ * @FilePath: \VESC_Code\motor\mcpwm_foc.c
+ * @Description: 
+ * 
+ * Copyright (c) 2025 by xiayuan, All Rights Reserved. 
+ */
+/*
 	Copyright 2016 - 2022 Benjamin Vedder	benjamin@vedder.se
 
 	This file is part of the VESC firmware.
@@ -338,7 +348,7 @@ static void timer_reinit(int f_zv) {
 }
 
 void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
-	utils_sys_lock_cnt();
+	utils_sys_lock_cnt();  // 系统锁定, 线程切换, 或者中断. 并不是保护所有的volatile变量.
 
 #ifndef HW_HAS_DUAL_MOTORS
 	(void)conf_m2;
@@ -346,10 +356,10 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 
 	m_init_done = false;
 
-	memset((void*)&m_motor_1, 0, sizeof(motor_all_state_t));
+	memset((void*)&m_motor_1, 0, sizeof(motor_all_state_t));  // 将涉及FOC控制的所有变量都初始化为0
 	m_isr_motor = 0;
 
-	m_motor_1.m_conf = conf_m1;
+	m_motor_1.m_conf = conf_m1;  // 一些电机配置可以照搬
 	m_motor_1.m_state = MC_STATE_OFF;
 	m_motor_1.m_control_mode = CONTROL_MODE_NONE;
 	m_motor_1.m_hall_dt_diff_last = 1.0;
@@ -413,7 +423,7 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 
 	dmaStreamAllocate(STM32_DMA_STREAM(STM32_DMA_STREAM_ID(2, 4)),
 					  5,
-					  (stm32_dmaisr_t)mcpwm_foc_adc_int_handler,
+					  (stm32_dmaisr_t)mcpwm_foc_adc_int_handler,  // 这是绑定了DMA转换完成后的处理函数吗
 					  (void *)0);
 
 	DMA_InitStructure.DMA_Channel = DMA_Channel_0;
@@ -438,10 +448,11 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 	// samples by then and we can start processing them. Entering the interrupt earlier gives
 	// more cycles to finish it and update the timer before the next zero vector. This helps
 	// at higher f_zv. Only use this if the three first samples are current samples.
+	// 半传输中断, 完成一半DMA传输即进入中断, 当ADC前三个值是电流采样值时, 进入中断一定转换完毕, 因此可以开启半传输中断
 #if ADC_IND_CURR1 < 3 && ADC_IND_CURR2 < 3 && ADC_IND_CURR3 < 3
-	DMA_ITConfig(DMA2_Stream4, DMA_IT_HT, ENABLE);
+	DMA_ITConfig(DMA2_Stream4, DMA_IT_HT, ENABLE);  // 半传输中断
 #else
-	DMA_ITConfig(DMA2_Stream4, DMA_IT_TC, ENABLE);
+	DMA_ITConfig(DMA2_Stream4, DMA_IT_TC, ENABLE);  // 完全传输中断
 #endif
 
 	// Note that the ADC is running at 42MHz, which is higher than the
@@ -568,7 +579,9 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 			m_motor_2.m_conf->foc_offsets_current[2] = MCCONF_FOC_OFFSETS_CURRENT_2;
 #endif
 
-			mcpwm_foc_dc_cal(false);
+			mcpwm_foc_dc_cal(false);  // 这里面有5秒以上的延时??
+			// 测current和votage的offset的, 为什么要测? 如何测?
+			// 开机时候的电流声应该就是它, 可以之后用示波器验证一下
 		}
 	} else {
 		m_dccal_done = true;
@@ -594,17 +607,20 @@ void mcpwm_foc_init(mc_configuration *conf_m1, mc_configuration *conf_m2) {
 		mc_interface_fault_stop(FAULT_CODE_BOOTING_FROM_WATCHDOG_RESET, false, false);
 	}
 
+	// 以下是终端命令的绑定, 我如果有想画的图或者想加的命令都可以模仿着加进去
 	terminal_register_command_callback(
 			"foc_tmp",
 			"FOC Test Print",
 			0,
-			terminal_tmp);
+			terminal_tmp);  
+		// 在终端可以用foc_tmp命令来画图
 
 	terminal_register_command_callback(
 			"foc_plot_hfi_en",
 			"Enable HFI plotting. 0: off, 1: DFT, 2: Raw",
 			"[en]",
 			terminal_plot_hfi);
+	// 在终端可以用foc_plot_hfi_en命令来画图
 
 	m_init_done = true;
 }
@@ -1500,11 +1516,11 @@ float mcpwm_foc_get_est_ind(void) {
  */
 int mcpwm_foc_encoder_detect(float current, bool print, float *offset, float *ratio, bool *inverted) {  //编码器整定函数
 	int fault = FAULT_CODE_NONE;
-	mc_interface_lock();
+	mc_interface_lock();  // 期间不允许任何其他命令控制电机
 
 	volatile motor_all_state_t *motor = get_motor_now();
 
-	motor->m_phase_override = true;
+	motor->m_phase_override = true;  // 允许手动控制相位, 但是相位写入之后, 如何真正让电机转动到那里?
 	motor->m_id_set = current;
 	motor->m_iq_set = 0.0;
 	motor->m_control_mode = CONTROL_MODE_CURRENT;
@@ -1531,7 +1547,7 @@ int mcpwm_foc_encoder_detect(float current, bool print, float *offset, float *ra
 
 	// Find index
 	int cnt = 0;
-	while(!encoder_index_found()) {
+	while(!encoder_index_found()) {  // 只有ABI编码器有这一步吧
 		for (float i = 0.0;i < 2.0 * M_PI;i += (2.0 * M_PI) / 500.0) {
 			motor->m_phase_now_override = i;
 			fault = mc_interface_get_fault();
@@ -1553,7 +1569,7 @@ int mcpwm_foc_encoder_detect(float current, bool print, float *offset, float *ra
 	}
 
 	// Rotate
-	for (float i = 0.0;i < 2.0 * M_PI;i += (2.0 * M_PI) / 500.0) {
+	for (float i = 0.0;i < 2.0 * M_PI;i += (2.0 * M_PI) / 500.0) {  // 旋转到电角度为0的位置
 		motor->m_phase_now_override = i;
 		fault = mc_interface_get_fault();
 		if (fault != FAULT_CODE_NONE) {
@@ -1566,20 +1582,20 @@ int mcpwm_foc_encoder_detect(float current, bool print, float *offset, float *ra
 		commands_printf("Rotated for sync");
 	}
 
-	// Inverted and ratio
-	chThdSleepMilliseconds(1000);
+	// Inverted and ratio  // 这一段是测定编码器的方向, 以及电机的电角度和机械角度的比值
+	chThdSleepMilliseconds(1000);  // 现实使用的时候真的有等待一秒的环节吗
 
 	const int it_rat = 30;
 	float s_sum = 0.0;
 	float c_sum = 0.0;
 	float first = motor->m_phase_now_encoder;
 
-	for (int i = 0; i < it_rat; i++) {
+	for (int i = 0; i < it_rat; i++) {  // 循环30次, 每次旋转2/3PI, 总计20PI, 电角度意义上的10圈?
 		float phase_old = motor->m_phase_now_encoder;
 		float phase_ovr_tmp = motor->m_phase_now_override;
 		for (float j = phase_ovr_tmp; j < phase_ovr_tmp + (2.0 / 3.0) * M_PI;
-			 j += (2.0 * M_PI) / 500.0) {
-			motor->m_phase_now_override = j;
+			 j += (2.0 * M_PI) / 500.0) {  // 总计旋转2/3PI, 每1ms旋转1/250PI, 也就是一次500/3ms
+			motor->m_phase_now_override = j;  // for循环的最后一次赋值, 与进入for循环前的phase_ovr_tmp相同, 保证这是连续的旋转
 			fault = mc_interface_get_fault();
 			if (fault != FAULT_CODE_NONE) {
 				goto exit_encoder_detect;
@@ -1587,28 +1603,34 @@ int mcpwm_foc_encoder_detect(float current, bool print, float *offset, float *ra
 			chThdSleepMilliseconds(1);
 		}
 
-		utils_norm_angle_rad((float*)&motor->m_phase_now_override);
-		chThdSleepMilliseconds(300);
+		utils_norm_angle_rad((float*)&motor->m_phase_now_override);  // 为什么要归回到-PI到PI之间?
+		chThdSleepMilliseconds(300);  // 这300ms的延时是否造成了有感整定时位置图像中的台阶式变化? 也许是标志一次旋转的短暂结束.
 		timeout_reset();
 		float diff = utils_angle_difference_rad(motor->m_phase_now_encoder, phase_old);
+		// 我们知道电角度变化是2/3PI, 现在来看看编码器角度变化了多少. (返回的是弧度角)
+		// 电角度没有变化超过2/3PI, 所以编码器不可能变化超过2/3PI, 不用担心这个函数在归一化的时候, 截断了2pi以上的角度变化.
+		// 由于每次旋转固定电角度, 所以编码器角度变化也应该几乎是固定的, 也就是diff是固定的
 
 		float s, c;
-		sincosf(diff, &s, &c);
+		sincosf(diff, &s, &c);  // 为什么要把角度变化转换为正弦余弦值来表示? 为什么不能直接累加diff?
 		s_sum += s;
-		c_sum += c;
+		c_sum += c;  
 
 		if (print) {
 			commands_printf("Diff: %.2f", (double)RAD2DEG_f(diff));
 		}
 
 		if (i > 3 && fabsf(utils_angle_difference_rad(motor->m_phase_now_encoder, first)) < fabsf(diff / 2.0)) {
+			// 这个判断退出的条件, 是判断, 当前编码器角度与开始旋转时编码器角度的差值绝对值小于diff/2, 也就是每次变化量的一半
+			// 这个条件保证每次正向旋转, 旋转实际编码器值接近一圈之后, 才会停止旋转.
+			// diff/2巧妙在, 每次停止旋转, 最多只旋转多或少一小段, 不超过diff/2, 正转和反转几乎是在同一个位置开始和停止的.
 			break;
 		}
 	}
 
 	first = motor->m_phase_now_encoder;
 
-	for (int i = 0; i < it_rat; i++) {
+	for (int i = 0; i < it_rat; i++) {  // 这次循环同上, 只不过是反向旋转.
 		float phase_old = motor->m_phase_now_encoder;
 		float phase_ovr_tmp = motor->m_phase_now_override;
 		for (float j = phase_ovr_tmp; j > phase_ovr_tmp - (2.0 / 3.0) * M_PI; j -= (2.0 * M_PI) / 500.0) {
@@ -1622,7 +1644,8 @@ int mcpwm_foc_encoder_detect(float current, bool print, float *offset, float *ra
 		utils_norm_angle_rad((float*)&motor->m_phase_now_override);
 		chThdSleepMilliseconds(300);
 		timeout_reset();
-		float diff = utils_angle_difference_rad(phase_old, motor->m_phase_now_encoder);
+		float diff = utils_angle_difference_rad(phase_old, motor->m_phase_now_encoder);  
+		// 与正转的时候计算方式相反, 也就是正转反转计算的符号是一样的
 
 		float s, c;
 		sincosf(diff, &s, &c);
@@ -1639,8 +1662,10 @@ int mcpwm_foc_encoder_detect(float current, bool print, float *offset, float *ra
 	}
 
 	float diff = RAD2DEG_f(atan2f(s_sum, c_sum));
-	*inverted = diff < 0.0;
-	*ratio = roundf(((2.0 / 3.0) * 180.0) / fabsf(diff));
+	*inverted = diff < 0.0;  // 新角度-旧角度, 是负数, 说明编码器增量与电机正转方向反向.
+	*ratio = roundf(((2.0 / 3.0) * 180.0) / fabsf(diff)); 
+	// 电角度变化2/3PI, 编码器变化diff, 所以ratio就是 2/3PI / diff, 一般diff小于2/3PI, 所以ratio大于1.
+	// 应该是个整数.
 
 	motor->m_conf->foc_encoder_inverted = *inverted;
 	motor->m_conf->foc_encoder_ratio = *ratio;
@@ -1650,6 +1675,8 @@ int mcpwm_foc_encoder_detect(float current, bool print, float *offset, float *ra
 		commands_printf("Ratio: %.2f", (double)*ratio);
 	}
 
+	// 以上, inverted 和 ratio 计算结束, 接下来要利用这两个数据来计算offset.
+
 	// Rotate
 	for (float i = motor->m_phase_now_override;i < 2.0 * M_PI;i += (2.0 * M_PI) / 500.0) {
 		motor->m_phase_now_override = i;
@@ -1658,7 +1685,10 @@ int mcpwm_foc_encoder_detect(float current, bool print, float *offset, float *ra
 			goto exit_encoder_detect;
 		}
 		chThdSleepMilliseconds(2);
-	}
+	}  
+	// 旋转到电角度的2PI, 也就是0. 这一步是不是导致整定过程中间图像出现V型变化的原因? 
+	// 但是V型变化似乎是正转再反转, 这段代码只有一个反向的旋转.
+	// 电角度归零, 应该是方便下一步
 
 	if (print) {
 		commands_printf("Rotated for sync");
@@ -1669,12 +1699,34 @@ int mcpwm_foc_encoder_detect(float current, bool print, float *offset, float *ra
 	s_sum = 0.0;
 	c_sum = 0.0;
 
-	for (int i = 0;i < it_ofs;i++) {
-		float step = (2.0 * M_PI * motor->m_conf->foc_encoder_ratio) / ((float)it_ofs);
+	// 计算offset的部分, 我的理解:
+	// 1. 为什么要分解成正弦余弦值?
+	// 将每次旋转的电角度和编码器角度差值转化为正弦值和余弦值, 是以向量形式将角度差表示在平面上.
+	// 这个向量在单位圆中, 模长固定为1, 所以合成时我们只需要关注其角度.
+	//
+	// 2. 为什么对累计的正弦余弦值进行atan2能得到offset?
+	// 代码执行是正转一圈再反转一圈, 期间产生了一系列角度差的向量. 
+	// 若编码器和电机电角度偏差是0, 那么这些向量合成在一起的结果就是0. 
+	// 但是如果存在一个offset, 无论是正转还是反转, 生成的向量都可以被分解为
+	// (没有offset时的角度差向量 + 固定offset向量) 两部分, 
+	// 其中没有offset的向量, 最后合成为0; 
+	// 固定offset向量合成产生一个指向某一角度的向量, 每一次累积几乎不会改变这个向量的方向, 只会增加模长. 
+	// 所有旋转结束后, 电机机械角度和电角度回到原点, 此时合成所有向量得到的只有offset的向量, 所以能用atan还原成offset. 
+	// 并且由于电机旋转过机械角度上的一圈, 所有电角度与机械角度的组合都被遍历, 产生同一组向量, 所以合成的offset不会有不同.
+	//
+	// 3. 为什么要分成两次正转和反转?
+	// 一次正转一次反转, 没有偏移的部分被抵消, offset角度向量被放大和平均, 理论上累积的次数越多越准确
+	
+	for (int i = 0;i < it_ofs;i++) {  
+		// 执行编码器ratio*3的次数循环, 每次旋转(2/3)*PI的电角度, ((2/3)*PI)/ratio的机械角度, 总计为机械角度的一圈.
+		// 也解释了这样的现象: ratio越大, 这一步整定用时越多.
+		float step = (2.0 * M_PI * motor->m_conf->foc_encoder_ratio) / ((float)it_ofs);  // 实际上计算出的step一直是2/3PI.
 		float override = (float)i * step;
 
 		while (motor->m_phase_now_override != override) {
-			utils_step_towards((float*)&motor->m_phase_now_override, override, step / 100.0);
+			utils_step_towards((float*)&motor->m_phase_now_override, override, step / 100.0);  
+			// 按照2/300PI步长步进, 手动修改电机相位, 直到达到目标值, 也就是比现在大2/3PI的位置.
+			// 循环100次, 用时400ms, 位置变化比较缓和.
 			fault = mc_interface_get_fault();
 			if (fault != FAULT_CODE_NONE) {
 				goto exit_encoder_detect;
@@ -1682,10 +1734,11 @@ int mcpwm_foc_encoder_detect(float current, bool print, float *offset, float *ra
 			chThdSleepMilliseconds(4);
 		}
 
-		chThdSleepMilliseconds(100);
+		chThdSleepMilliseconds(100);  // 造成台阶型图像.
 		timeout_reset();
 
 		float angle_diff = utils_angle_difference_rad(motor->m_phase_now_encoder, motor->m_phase_now_override);
+		// 电角度变化2/3PI, 记录编码器角度与电角度差值(使用as5047时, 实际是机械角度与电角度差值)
 		float s, c;
 		sincosf(angle_diff, &s, &c);
 		s_sum += s;
@@ -1696,7 +1749,7 @@ int mcpwm_foc_encoder_detect(float current, bool print, float *offset, float *ra
 		}
 	}
 
-	for (int i = it_ofs;i > 0;i--) {
+	for (int i = it_ofs;i > 0;i--) {  // 反转, 同上
 		float step = (2.0 * M_PI * motor->m_conf->foc_encoder_ratio) / ((float)it_ofs);
 		float override = (float)i * step;
 
@@ -2714,7 +2767,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 	(void)flags;
 
 	static int skip = 0;
-	if (++skip == FOC_CONTROL_LOOP_FREQ_DIVIDER) {
+	if (++skip == FOC_CONTROL_LOOP_FREQ_DIVIDER) {  // 修改这个可以达到减采样的效果
 		skip = 0;
 	} else {
 		return;
@@ -2748,14 +2801,14 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 
 	bool skip_interpolation = motor_other->m_cc_was_hfi;
 
-	mc_interface_selflock();
+// 	mc_interface_selflock();
 
-#if defined  STALLING_DETECT
-	mc_interface_max_current_detect();
-#endif
+// #if defined  STALLING_DETECT
+ 	// mc_interface_max_current_detect();
+// #endif
 
 	// Update modulation for V7 and collect current samples. This is used by the HFI.
-	if (motor_other->m_duty_next_set) {
+	if (motor_other->m_duty_next_set) {  // 以下一大堆是HFI专用
 		motor_other->m_duty_next_set = false;
 		skip_interpolation = true;
 #ifdef HW_HAS_DUAL_MOTORS
@@ -2775,7 +2828,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		float curr0 = (GET_CURRENT1() - conf_other->foc_offsets_current[0]) * FAC_CURRENT;
 		float curr1 = (GET_CURRENT2() - conf_other->foc_offsets_current[1]) * FAC_CURRENT; //采样了
 
-		TIMER_UPDATE_DUTY_M1(motor_other->m_duty1_next, motor_other->m_duty2_next, motor_other->m_duty3_next); //更新定时器占空比，M1用TIM1控制
+		TIMER_UPDATE_DUTY_M1(motor_other->m_duty1_next, motor_other->m_duty2_next, motor_other->m_duty3_next); //更新定时器占空比，M1用TIM1控制  // 但是哪来的占空比?
 #ifdef HW_HAS_DUAL_PARALLEL
 		TIMER_UPDATE_DUTY_M2(motor_other->m_duty1_next, motor_other->m_duty2_next, motor_other->m_duty3_next);
 #endif
@@ -2783,6 +2836,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 
 		motor_other->m_i_alpha_sample_next = curr0;
 		motor_other->m_i_beta_sample_next = ONE_BY_SQRT3 * curr0 + TWO_BY_SQRT3 * curr1; //根号3分之1
+		// 用两相电流采样即可进行clark变换, 得到i_alpha和i_beta
 	}
 
 	bool do_return = false;
@@ -2807,11 +2861,11 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		dt = 1.0 / (conf_now->foc_f_zv / 2.0);
 	}
 #else
-	float dt = 1.0 / (conf_now->foc_f_zv / 2.0);
+	float dt = 1.0 / (conf_now->foc_f_zv / 2.0); // 为什么是1/2? dt是干什么的?
 #endif
 
 	
-
+	// 采样模式是V0_V7插值, 
 	if (conf_other->foc_control_sample_mode == FOC_CONTROL_SAMPLE_MODE_V0_V7_INTERPOL && !skip_interpolation) {
 		float interpolated_phase = motor_other->m_motor_state.phase + motor_other->m_speed_est_fast * dt * 0.5;  //相位插值计算
 		utils_norm_angle_rad(&interpolated_phase);
@@ -2823,7 +2877,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		state_m->phase_sin = s;
 		state_m->phase_cos = c;
 		state_m->mod_alpha_raw = c * state_m->mod_d - s * state_m->mod_q;
-		state_m->mod_beta_raw  = c * state_m->mod_q + s * state_m->mod_d;  //疑似帕克变换
+		state_m->mod_beta_raw  = c * state_m->mod_q + s * state_m->mod_d;  //疑似帕克变换  // 这是park逆变换, 小孩子不懂事写着玩的
+		// 这里mod_d和mod_q的来源是current_control, 也就是电流环控制器
 
 		uint32_t duty1, duty2, duty3, top;
 		top = TIM1->ARR;
@@ -2842,7 +2897,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 #endif
 		}
 #else
-		TIMER_UPDATE_DUTY_M1(duty1, duty2, duty3);
+		TIMER_UPDATE_DUTY_M1(duty1, duty2, duty3);  // 直接应用占空比
 #endif
 	}
 
@@ -2882,7 +2937,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 #ifdef HW_HAS_DUAL_MOTORS
 	float curr2 = is_second_motor ? GET_CURRENT3_M2() : GET_CURRENT3();
 #else
-	float curr2 = GET_CURRENT3();
+	float curr2 = GET_CURRENT3();  // 我们的电调有三个采样电阻
 #ifdef HW_HAS_DUAL_PARALLEL
 	curr2 += GET_CURRENT3_M2();
 #endif
@@ -2897,14 +2952,14 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 	motor_now->m_currents_adc[2] = 0.0;
 #endif
 
-	curr0 -= conf_now->foc_offsets_current[0];
+	curr0 -= conf_now->foc_offsets_current[0];  // offset在init的时候计算过了, 但是为什么会有offset的存在呢?
 	curr1 -= conf_now->foc_offsets_current[1];
 #ifdef HW_HAS_3_SHUNTS
 	curr2 -= conf_now->foc_offsets_current[2];
-	motor_now->m_curr_unbalance = curr0 + curr1 + curr2;
+	motor_now->m_curr_unbalance = curr0 + curr1 + curr2;  // 算这个好像没大用
 #endif
 
-	ADC_curr_norm_value[0 + norm_curr_ofs] = curr0;
+	ADC_curr_norm_value[0 + norm_curr_ofs] = curr0;  // 加这个norm_curr_ofs是给第二个motor用的, 一般这个值一直是0
 	ADC_curr_norm_value[1 + norm_curr_ofs] = curr1;
 #ifdef HW_HAS_3_SHUNTS
 	ADC_curr_norm_value[2 + norm_curr_ofs] = curr2;
@@ -2917,6 +2972,9 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 	if (conf_now->foc_current_sample_mode == FOC_CURRENT_SAMPLE_MODE_HIGH_CURRENT) {
 		// High current sampling mode. Choose the lower currents to derive the highest one
 		// in order to be able to measure higher currents.
+		// 大电流 = 小电流+小电流, 当大电流超过ADC的量程时, 直接用小电流的和来表示大电流
+		// 硬件配置中似乎提到过, 这个ADC采样范围大概是150A以内.
+		
 		const float i0_abs = fabsf(ADC_curr_norm_value[0 + norm_curr_ofs]);
 		const float i1_abs = fabsf(ADC_curr_norm_value[1 + norm_curr_ofs]);
 		const float i2_abs = fabsf(ADC_curr_norm_value[2 + norm_curr_ofs]);
@@ -2928,7 +2986,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		} else if (i2_abs > i0_abs && i2_abs > i1_abs) {
 			ADC_curr_norm_value[2 + norm_curr_ofs] = -(ADC_curr_norm_value[0 + norm_curr_ofs] + ADC_curr_norm_value[1 + norm_curr_ofs]);
 		}
-	} else if (conf_now->foc_current_sample_mode == FOC_CURRENT_SAMPLE_MODE_LONGEST_ZERO) {
+	} else if (conf_now->foc_current_sample_mode == FOC_CURRENT_SAMPLE_MODE_LONGEST_ZERO) {  
+		// 采样模式默认是FOC_CURRENT_SAMPLE_MODE_LONGEST_ZERO
 #ifdef HW_HAS_PHASE_SHUNTS
 		if (is_v7) {
 			if (tim->CCR1 > 500 && tim->CCR2 > 500) {  //前两项占空比较大，用前两相计算第三相
@@ -2960,11 +3019,14 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 			}
 		}
 #else
-		if (tim->CCR1 < (tim->ARR - 500) && tim->CCR2 < (tim->ARR - 500)) {
+		if (tim->CCR1 < (tim->ARR - 500) && tim->CCR2 < (tim->ARR - 500)) {  
+			// 通过占空比来判断, 这个条件说的是duty1和duty2都小于ARR-500
 			// Use the same 2 shunts on low modulation, as that will avoid jumps in the current reading.
 			// This is especially important when using HFI.
 			ADC_curr_norm_value[2 + norm_curr_ofs] = -(ADC_curr_norm_value[0 + norm_curr_ofs] + ADC_curr_norm_value[1 + norm_curr_ofs]);
-		} else {
+		} else {  
+			// 否则利用低占空比(low modulation)来估计高占空比, 并且高占空比的电流值符号一定与两个低占空比的电流值符号相反
+			// 有个问题, ADC采样值能是负数吗?
 			if (tim->CCR1 > tim->CCR2 && tim->CCR1 > tim->CCR3) {
 				ADC_curr_norm_value[0 + norm_curr_ofs] = -(ADC_curr_norm_value[1 + norm_curr_ofs] + ADC_curr_norm_value[2 + norm_curr_ofs]);
 			} else if (tim->CCR2 > tim->CCR1 && tim->CCR2 > tim->CCR3) {
@@ -2979,19 +3041,19 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 
 	float ia = ADC_curr_norm_value[0 + norm_curr_ofs] * FAC_CURRENT;
 	float ib = ADC_curr_norm_value[1 + norm_curr_ofs] * FAC_CURRENT;
-	float ic = ADC_curr_norm_value[2 + norm_curr_ofs] * FAC_CURRENT;
+	float ic = ADC_curr_norm_value[2 + norm_curr_ofs] * FAC_CURRENT;  // 之前还是ADC数值, 现在是电流值了
 
 	// This has to be done for the skip function to have any chance at working with the
 	// observer and control loops.
 	// TODO: Test this.
-	dt *= (float)FOC_CONTROL_LOOP_FREQ_DIVIDER;
+	dt *= (float)FOC_CONTROL_LOOP_FREQ_DIVIDER;  // 之前修改FOC_CONTROL_LOOP_FREQ_DIVIDER造成了减采样, 这里按照倍数延长dt.
 
-	UTILS_LP_FAST(motor_now->m_motor_state.v_bus, GET_INPUT_VOLTAGE(), 0.1);
+	UTILS_LP_FAST(motor_now->m_motor_state.v_bus, GET_INPUT_VOLTAGE(), 0.1);  
 
 	volatile float enc_ang = 0;
 	volatile bool encoder_is_being_used = false;
 
-	if (virtual_motor_is_connected()) {  //“virtual motor”和使用encoder似乎是冲突的？那么“virtual motor”是不是对应无感？
+	if (virtual_motor_is_connected()) {  //“virtual motor”和使用encoder似乎是冲突的？那么“virtual motor”是不是对应无感？  // 并不是, virtual motor是只有模型没有实物的电机, 类似于跑仿真
 		if (conf_now->foc_sensor_mode == FOC_SENSOR_MODE_ENCODER ) {
 			enc_ang = virtual_motor_get_angle_deg();
 			encoder_is_being_used = true;
@@ -3010,25 +3072,25 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		}
 		phase_tmp *= conf_now->foc_encoder_ratio;
 		phase_tmp -= conf_now->foc_encoder_offset;
-		utils_norm_angle((float*)&phase_tmp);  //编码器的转换，增益/偏差/多圈变单圈
+		utils_norm_angle((float*)&phase_tmp);  //编码器的转换，增益/偏差/多圈变单圈  // 编码器角度转化为电角度
 		motor_now->m_phase_now_encoder = DEG2RAD_f(phase_tmp);//角度->弧度
 	}
 
 	if (motor_now->m_state == MC_STATE_RUNNING) {//电机运动的情况下的一堆赋值和计算
-		if (conf_now->foc_current_sample_mode == FOC_CURRENT_SAMPLE_MODE_ALL_SENSORS) { //使用三个采样电阻
+		if (conf_now->foc_current_sample_mode == FOC_CURRENT_SAMPLE_MODE_ALL_SENSORS) { //使用三个采样电阻  // 似乎不会有这种情况
 			// Full Clarke Transform
 			motor_now->m_motor_state.i_alpha = (2.0 / 3.0) * ia - (1.0 / 3.0) * ib - (1.0 / 3.0) * ic;
 			motor_now->m_motor_state.i_beta = ONE_BY_SQRT3 * ib - ONE_BY_SQRT3 * ic;
 		} else {
 			// Clarke transform assuming balanced currents
 			motor_now->m_motor_state.i_alpha = ia;
-			motor_now->m_motor_state.i_beta = ONE_BY_SQRT3 * ia + TWO_BY_SQRT3 * ib; //只用两个
+			motor_now->m_motor_state.i_beta = ONE_BY_SQRT3 * ia + TWO_BY_SQRT3 * ib; //只用两个  // 一般是这个
 		}
 
 		motor_now->m_i_alpha_sample_with_offset = motor_now->m_motor_state.i_alpha;
 		motor_now->m_i_beta_sample_with_offset = motor_now->m_motor_state.i_beta;
 
-		if (motor_now->m_i_alpha_beta_has_offset) {  //计算的α和β轴电流有偏差，进行补偿
+		if (motor_now->m_i_alpha_beta_has_offset) {  //计算的α和β轴电流有偏差，进行补偿  // 这里只有开启HFI的时候才会进入
 			motor_now->m_motor_state.i_alpha = 0.5 * (motor_now->m_motor_state.i_alpha + motor_now->m_i_alpha_sample_next); //相当于容量等于2的均值滤波？
 			motor_now->m_motor_state.i_beta = 0.5 * (motor_now->m_motor_state.i_beta + motor_now->m_i_beta_sample_next);
 			motor_now->m_i_alpha_beta_has_offset = false;
@@ -3036,11 +3098,11 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 
 		const float duty_now = motor_now->m_motor_state.duty_now;
 		const float duty_abs = fabsf(duty_now);
-		const float vq_now = motor_now->m_motor_state.vq;
+		const float vq_now = motor_now->m_motor_state.vq;  // vq是来自current_control的, 通过PI控制器计算出来的
 		const float speed_fast_now = motor_now->m_pll_speed;  //相位环锁定（？）得到现在速度
 
 		float id_set_tmp = motor_now->m_id_set;
-		float iq_set_tmp = motor_now->m_iq_set;  //搞一大堆临时变量用于下一步计算
+		float iq_set_tmp = motor_now->m_iq_set;  // 两个set是通过外部过程计算的, 例如整定过程需要的电流, 或速度环PID计算出的电流
 		motor_now->m_motor_state.max_duty = conf_now->l_max_duty;
 
 		if (motor_now->m_control_mode == CONTROL_MODE_CURRENT_BRAKE) {
@@ -3051,19 +3113,20 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		utils_truncate_number_abs((float*)&motor_now->m_duty_abs_filtered, 1.0);
 
 		UTILS_LP_FAST(motor_now->m_duty_filtered, duty_now, 0.01);//这一次滤波的数据 -= 上一次滤波后数据与这一次作比较的差值，乘以0.01
-		utils_truncate_number_abs((float*)&motor_now->m_duty_filtered, 1.0);//为什么要搞一大堆低通滤波呢？
+		utils_truncate_number_abs((float*)&motor_now->m_duty_filtered, 1.0);//为什么要搞一大堆低通滤波呢？  // 为了不被尖峰触发报错
 
 		float duty_set = motor_now->m_duty_cycle_set;
 		bool control_duty = motor_now->m_control_mode == CONTROL_MODE_DUTY ||
 				motor_now->m_control_mode == CONTROL_MODE_OPENLOOP_DUTY ||
 				motor_now->m_control_mode == CONTROL_MODE_OPENLOOP_DUTY_PHASE;
+			// VESC特有的占空比控制模式吗
 
 		// Short all phases (duty=0) the moment the direction or modulation changes sign. That will avoid
 		// active braking or changing direction. Keep all phases shorted (duty == 0) until the
 		// braking current reaches the set or maximum value, then go back to current control
 		// mode. Stay in duty=0 for at least 10 cycles to avoid jumping in and out of that mode rapidly
 		// around the threshold.
-		if (motor_now->m_control_mode == CONTROL_MODE_CURRENT_BRAKE) {
+		if (motor_now->m_control_mode == CONTROL_MODE_CURRENT_BRAKE) {  // 电流刹车模式, 直接把duty拉到0
 			if ((SIGN(speed_fast_now) != SIGN(motor_now->m_br_speed_before) ||
 					SIGN(vq_now) != SIGN(motor_now->m_br_vq_before) ||
 					fabsf(motor_now->m_duty_filtered) < 0.001 || motor_now->m_br_no_duty_samples < 10) &&
@@ -3105,6 +3168,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		if (motor_now->m_control_mode == CONTROL_MODE_CURRENT_BRAKE) {
 			current_max_for_duty = fabsf(conf_now->lo_current_min);
 		}
+		// 对电流上下限做限制
 
 		if (!control_duty) {
 			motor_now->m_duty_i_term = motor_now->m_motor_state.iq / current_max_for_duty;
@@ -3112,9 +3176,12 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		}
 
 		if (control_duty) {
+			// 对于duty control, 测量 > 设定, 计算电流采用PI控制器; 设定 > 测量, 直接使用最大电流, 
+			// 这不基本上还是用PI控制器的电流控制吗??
 			// Duty cycle control
-			if (fabsf(duty_set) < (duty_abs - 0.01)/*占空比减小幅度大于0.01，则用一个PI控制器来控制*/  &&
-					(!motor_now->duty_was_pi || SIGN(motor_now->duty_pi_duty_last) == SIGN(duty_now))) {
+			if (fabsf(duty_set) < (duty_abs - 0.01) && (!motor_now->duty_was_pi || 
+				SIGN(motor_now->duty_pi_duty_last) == SIGN(duty_now))) {
+				// 从高占空比变化到低占空比, 直接截断会很危险, 所以使用PI控制器
 				// Truncating the duty cycle here would be dangerous, so run a PI controller.
 
 				motor_now->duty_pi_duty_last = duty_now;
@@ -3149,7 +3216,9 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 				float output = p_term + motor_now->m_duty_i_term;
 				utils_truncate_number(&output, -1.0, 1.0);
 				iq_set_tmp = output * current_max_for_duty;  //整个这一段，占空比从大到小的控制通过PI控制器来完成，最后这几行就是PI计算
+				// 没有涉及i_d的计算
 			} else {
+				// 从低占空比到高占空比, 不需要PI控制器, 直接使用最大电流
 				// If the duty cycle is less than or equal to the set duty cycle just limit
 				// the modulation and use the maximum allowed current.
 				motor_now->m_duty_i_term = motor_now->m_motor_state.iq / current_max_for_duty;
@@ -3168,11 +3237,11 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 
 		// Set motor phase
 		{
-			if (!motor_now->m_phase_override) {
+			if (!motor_now->m_phase_override) {  // m_phase_override是true的情况只有整定时候, 其他时候都是false
 				foc_observer_update(motor_now->m_motor_state.v_alpha, motor_now->m_motor_state.v_beta,
 						motor_now->m_motor_state.i_alpha, motor_now->m_motor_state.i_beta,
 						dt, &(motor_now->m_observer_state), &motor_now->m_phase_now_observer, motor_now);
-
+				// 电机在旋转, 计算的过程中相位会有变化, 这里根据转速做一个估计补偿.
 				// Compensate from the phase lag caused by the switching frequency. This is important for motors
 				// that run on high ERPM compared to the switching frequency.
 				motor_now->m_phase_now_observer += motor_now->m_pll_speed * dt * (0.5 + conf_now->foc_observer_offset);
@@ -3180,6 +3249,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 			}
 
 			switch (conf_now->foc_sensor_mode) {  //根据不同的encoder选择不同的参数设置，开始
+			// 主要是计算相位, 目前FOC进程还处于获取相位(电角度)的阶段    // we can never against the stream i know.
 			case FOC_SENSOR_MODE_ENCODER:
 				if (encoder_index_found() || virtual_motor_is_connected()) {
 					motor_now->m_motor_state.phase = foc_correct_encoder(  //可能是检查编码器的值是否可靠

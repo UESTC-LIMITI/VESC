@@ -245,6 +245,7 @@ void foc_svm(float alpha, float beta, uint32_t PWMFullDutyCycle,
 			}
 		}
 	}
+	// 先算扇区
 
 	// PWM timings
 	uint32_t tA, tB, tC;
@@ -334,6 +335,7 @@ void foc_svm(float alpha, float beta, uint32_t PWMFullDutyCycle,
 
 		break;
 	}
+	// 然后算时间
 	}
 
 	*tAout = tA;
@@ -879,7 +881,7 @@ void foc_hfi_adjust_angle(float ang_err, motor_all_state_t *motor, float dt) {
 }
 
 void foc_precalc_values(motor_all_state_t *motor) {
-	const mc_configuration *conf_now = motor->m_conf;
+	const mc_configuration *conf_now = motor->m_conf;  
 	motor->p_lq = conf_now->foc_motor_l + conf_now->foc_motor_ld_lq_diff * 0.5;
 	motor->p_ld = conf_now->foc_motor_l - conf_now->foc_motor_ld_lq_diff * 0.5;
 	motor->p_inv_ld_lq = (1.0 / motor->p_lq - 1.0 / motor->p_ld);

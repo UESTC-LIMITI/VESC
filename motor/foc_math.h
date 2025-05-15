@@ -208,7 +208,9 @@ typedef struct {             //电机的所有参数
 	float p_ld;
 	float p_inv_ld_lq; // (1.0/lq - 1.0/ld)
 	float p_v2_v3_inv_avg_half; // (0.5/ld + 0.5/lq)
-} motor_all_state_t;  //应该是只在FOC计算里用到的电机所有参数
+} motor_all_state_t;  
+// 在FOC计算里用到的电机所有参数
+// 包含interface.h里所有的电机参数
 
 // Functions
 void foc_observer_update(float v_alpha, float v_beta, float i_alpha, float i_beta,

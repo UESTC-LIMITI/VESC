@@ -98,6 +98,7 @@ void utils_rotate_vector3(float *input, float *rotation, float *output, bool rev
  * Filter constant. Range 0.0 to 1.0, where 1.0 gives the unfiltered value.
  */
 #define UTILS_LP_FAST(value, sample, filter_constant)	(value -= (filter_constant) * ((value) - (sample)))  //简易低通滤波
+// 实现方法是只关注新值和当前值的差值, 并且差值的影响小于1, 例如filter_constant给0.1, 那么要十次以上一样的变化, 才能大约达到新值
 
 /**
  * A fast approximation of a moving average filter with N samples. See

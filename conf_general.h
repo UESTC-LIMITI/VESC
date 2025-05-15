@@ -120,6 +120,9 @@
 
 // Current ADC to amperes factor
 #define FAC_CURRENT					((V_REG / 4095.0) / (CURRENT_SHUNT_RES * CURRENT_AMP_GAIN))
+// CURRENT_SHUNT_RES 和采样电阻有关
+// Current ADC to amperes factor for the second motor
+// CURRENT_AMP_GAIN和采样芯片配置有关
 
 #define VOLTAGE_TO_ADC_FACTOR	( VIN_R2 / (VIN_R2 + VIN_R1) ) * ( 4096.0 / V_REG )
 
