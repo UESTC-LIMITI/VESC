@@ -226,7 +226,7 @@ int main(void) {
 	INIT_BR();
 #endif
 
-	HW_EARLY_INIT();
+	HW_EARLY_INIT();  // 空的宏定义
 
 #ifdef BOOT_OK_GPIO
 	palSetPadMode(BOOT_OK_GPIO, BOOT_OK_PIN, PAL_MODE_OUTPUT_PUSHPULL);

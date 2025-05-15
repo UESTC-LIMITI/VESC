@@ -1,4 +1,12 @@
 /*
+ * @Date: 2025-04-27 23:59:37
+ * @LastEditors: xiayuan 1137542776@qq.com
+ * @LastEditTime: 2025-04-28 01:44:20
+ * @FilePath: \VESC\conf_general.h
+ * @Description:与上位机有关的配置，改变这个文件可以改变上位机的显示内容
+ * .c文件中还有上位机中可操作的内容, 例如启动电机参数检测, 读取/写入电机设置和app设置
+ */
+/*
 	Copyright 2017 - 2022 Benjamin Vedder	benjamin@vedder.se
 
 	This file is part of the VESC firmware.

@@ -34,7 +34,10 @@ int lbm_perform_gc(void);
 
 bool lbm_start_flatten(lbm_flat_value_t *v, size_t buffer_size) {
 
-  uint8_t *data = lbm_malloc_reserve(buffer_size);
+  uint8_t *data = lbm_malloc_reserve(buffer_size);  
+  // 这里分配内存不使用malloc, 而是lispBM自己管理编译时就分配好的内存池, 
+  // 步骤包括检查内存池是否足够, 申请内存, 以及设置内存池的状态.
+  // 这是否体现了lispBM的内存管理机制?
   if (!data) return false;
 
   v->buf = data;
@@ -44,7 +47,7 @@ bool lbm_start_flatten(lbm_flat_value_t *v, size_t buffer_size) {
 }
 
 bool lbm_finish_flatten(lbm_flat_value_t *v) {
-
+  // 与start_flatten对应, 先前可能超量分配内存, 现在释放多余的内存.
   lbm_uint size_words;
 
   if (v->buf_pos % sizeof(lbm_uint) == 0) {

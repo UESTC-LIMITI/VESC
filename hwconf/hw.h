@@ -1,7 +1,7 @@
 /*
  * @Date: 2025-04-25 22:44:25
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2025-04-25 22:51:14
+ * @LastEditTime: 2025-04-28 19:07:11
  * @FilePath: \VESC\hwconf\hw.h
  * @Description:这个文件是VESC的硬件配置, 描述电调硬件有哪些模块, 
  * 每个模块的引脚连接, 例如SPI引脚, ADC引脚. 还观察到有一些空的宏定义, 

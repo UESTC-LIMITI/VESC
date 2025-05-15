@@ -40,7 +40,7 @@ static int m_appconf_highest = 0;
 static uint8_t packet_buffer[PACKET_MAX_PL_LEN];
 static mutex_t packet_buffer_mutex;
 
-void mempools_init(void) {
+void mempools_init(void) {  // 只是初始化一个互斥锁
 	chMtxObjectInit(&packet_buffer_mutex);
 }
 

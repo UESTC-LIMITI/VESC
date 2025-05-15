@@ -1,4 +1,11 @@
 /*
+ * @Date: 2025-04-28 01:06:22
+ * @LastEditors: xiayuan 1137542776@qq.com
+ * @LastEditTime: 2025-04-28 01:08:55
+ * @FilePath: \VESC\applications\app.h
+ * @Description:这一对.c和.h文件中定义了app设置的读写操作函数, 以及一些预留接口的操作函数, 例如外部ADC, UART等
+ */
+/*
 	Copyright 2016 Benjamin Vedder	benjamin@vedder.se
 
 	This file is part of the VESC firmware.
