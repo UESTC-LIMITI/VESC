@@ -2,7 +2,7 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-25 20:23:49
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2025-05-15 23:14:17
+ * @LastEditTime: 2025-05-15 23:20:39
  * @FilePath: \VESC\motor\mcpwm_foc.c
  * @Description: 
  * 
@@ -946,7 +946,7 @@ void mcpwm_foc_set_openloop_current(float current, float rpm) {
  * @param phase
  * The phase to use in degrees, range [0.0 360.0]
  */
-void mcpwm_foc_set_openloop_phase(float current, float phase) {
+void mcpwm_foc_set_openloop_phase(float current, float phase) {  // 直接电流控制, phase是电流的相位角
 	utils_truncate_number(&current, -get_motor_now()->m_conf->l_current_max * get_motor_now()->m_conf->l_current_max_scale,
 						  get_motor_now()->m_conf->l_current_max * get_motor_now()->m_conf->l_current_max_scale);
 
@@ -3343,7 +3343,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 				}
 				break;
 			}  //根据不同的encoder选择不同的参数设置，结束
-			// 相位的计算结束, 总体分为四部分: 编码器/霍尔传感器/无感/高频注入
+			// 通过不同传感器得到初步的相位的部分, 结束, 总体分为四种情况: 编码器/霍尔传感器/无感/高频注入
 
 			if (motor_now->m_control_mode == CONTROL_MODE_HANDBRAKE) {  //根据不同的控制模式选择相位的计算方式，开始
 				// Force the phase to 0 in handbrake mode so that the current simply locks the rotor.
@@ -3352,7 +3352,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 					motor_now->m_control_mode == CONTROL_MODE_OPENLOOP_DUTY) {
 				motor_now->m_openloop_angle += dt * motor_now->m_openloop_speed;  //开环，直接暴力预测位置=当前角度+时间*角速度
 				utils_norm_angle_rad((float*)&motor_now->m_openloop_angle);
-				motor_now->m_motor_state.phase = motor_now->m_openloop_angle;
+				motor_now->m_motor_state.phase = motor_now->m_openloop_angle;  // 这是真开环, 会用到这个模式吗
 			} else if (motor_now->m_control_mode == CONTROL_MODE_OPENLOOP_PHASE ||
 					motor_now->m_control_mode == CONTROL_MODE_OPENLOOP_DUTY_PHASE) {
 				motor_now->m_motor_state.phase = motor_now->m_openloop_phase;
