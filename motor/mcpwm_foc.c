@@ -2,8 +2,8 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-25 20:23:49
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2025-05-16 10:43:00
- * @FilePath: \VESC\motor\mcpwm_foc.c
+ * @LastEditTime: 2025-05-17 13:24:31
+ * @FilePath: \VESC_Code\motor\mcpwm_foc.c
  * @Description: 
  * 
  * Copyright (c) 2025 by xiayuan, All Rights Reserved. 
@@ -4288,12 +4288,19 @@ static void control_current(motor_all_state_t *motor, float dt) {
 
 	// Park transform: transforms the currents from stator to the rotor reference frame
 	state_m->id = c * state_m->i_alpha + s * state_m->i_beta;
-	state_m->iq = c * state_m->i_beta  - s * state_m->i_alpha;
+	state_m->iq = c * state_m->i_beta  - s * state_m->i_alpha;  
+	// i_alpha和i_beta是通过采样得到的
+	// park变换得到当前id, iq值
 
 	// Low passed currents are used for less time critical parts, not for the feedback
+	// 低通滤波, 会引入延迟, 所以是给不太要求实时性的部分用的, 不是给本次FOC反馈计算用的.
 	UTILS_LP_FAST(state_m->id_filter, state_m->id, conf_now->foc_current_filter_const);
 	UTILS_LP_FAST(state_m->iq_filter, state_m->iq, conf_now->foc_current_filter_const);
 
+	// 以下代码块, 计算d轴电流的PI控制器增益限制, 这种限制主要是在高调制(高占空比)的情况下
+	// 一般d轴电流是0, 但是当d轴电流不为0, 高占空比下: 
+	// (1)相电压要接近母线电压, 电压资源吃紧, 如果不限制d轴电压, 可能会影响q轴电压的供给, 导致转矩不足等问题;
+	// (2)果d轴PI增益过高，容易导致积分环节快速累积，输出电压超出硬件能力，产生饱和、wind up，甚至引发系统振荡。
 	float d_gain_scale = 1.0;
 	if (conf_now->foc_d_gain_scale_start < 0.99) {
 		float max_mod_norm = fabsf(state_m->duty_now / max_duty);
@@ -4317,6 +4324,7 @@ static void control_current(motor_all_state_t *motor, float dt) {
 		ki = motor->m_current_ki_temp_comp;
 	}
 
+	// 接下来用到的kp和ki似乎是根据检测到的电机参数计算得出的
 	state_m->vd_int += Ierr_d * (ki * d_gain_scale * dt);
 	state_m->vq_int += Ierr_q * (ki * dt);
 
