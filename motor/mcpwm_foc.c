@@ -2,7 +2,7 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-25 20:23:49
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2025-05-15 23:20:39
+ * @LastEditTime: 2025-05-16 10:43:00
  * @FilePath: \VESC\motor\mcpwm_foc.c
  * @Description: 
  * 
@@ -1058,7 +1058,7 @@ void mcpwm_foc_set_openloop_duty(float dutyCycle, float rpm) {
  * @param phase
  * The phase to use in degrees, range [0.0 360.0]
  */
-void mcpwm_foc_set_openloop_duty_phase(float dutyCycle, float phase) {
+void mcpwm_foc_set_openloop_duty_phase(float dutyCycle, float phase) {  // 直接电压(占空比)控制, phase是电压的相位角
 	get_motor_now()->m_control_mode = CONTROL_MODE_OPENLOOP_DUTY_PHASE;
 	get_motor_now()->m_duty_cycle_set = dutyCycle;
 	get_motor_now()->m_openloop_phase = DEG2RAD_f(phase);
@@ -3359,13 +3359,13 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 			}
 
 			if (motor_now->m_phase_override) {
-				motor_now->m_motor_state.phase = motor_now->m_phase_now_override;//用obsever来控制，当前相位 = observer的相位
+				motor_now->m_motor_state.phase = motor_now->m_phase_now_override;//用obsever来控制，当前相位 = observer的相位 // <- 并非, 小孩子不懂事乱写的
 			}
 
 			utils_fast_sincos_better(motor_now->m_motor_state.phase,
 					(float*)&motor_now->m_motor_state.phase_sin,
 					(float*)&motor_now->m_motor_state.phase_cos);
-		}//根据不同的控制模式选择相位的计算方式，结束
+		}//根据不同的控制模式选择相位的计算方式，结束  // 以上一坨都是phase
 
 		// Apply MTPA. See: https://github.com/vedderb/bldc/pull/179    //应用单位电流最大转矩比值
 		const float ld_lq_diff = conf_now->foc_motor_ld_lq_diff;     //ld-lq diff
@@ -3375,14 +3375,27 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 			float iq_ref = iq_set_tmp;
 			if (conf_now->foc_mtpa_mode == MTPA_MODE_IQ_MEASURED) {
 				iq_ref = utils_min_abs(iq_set_tmp, motor_now->m_motor_state.iq_filter);
+				// 使用iq_set_tmp和iq_filter的最小值来计算.
+				//
+				// iq_filter是在电流控制器中经过iq低通滤波来的, iq是通过i_alpha和i_beta计算来的,
+				// i_alpha和i_beta是用采样的三相电流计算得来的, 在同一个函数的上面就算出来了.
+				//
+				// 但是 iq_filter是下面control_current函数种计算的, 这里用到的iq_filter是上次计算的值.
+				// 既然本次已经有采样结果, 为什么不使用最新的iq计算一次iq_filter, 然后投入使用, 
+				// 一定要用上次的值吗? MPTA的计算是基于一定基于上次的iq_filter吗?
+				//
+				// VESC tool中说, 这个MTPA_MODE_IQ_MEASURED是基于测量的iq来计算id, 使用的是上次测量的iq
+				// 我还能理解, 但是为什么实际是取了一个设定和测量的最小值? 
 			}
-
+			// 根据神秘公式计算id和iq的值, 还需学习MTPA的原理, 详见上面的链接
 			id_set_tmp = (lambda - sqrtf(SQ(lambda) + 8.0 * SQ(ld_lq_diff * iq_ref))) / (4.0 * ld_lq_diff);
 			iq_set_tmp = SIGN(iq_set_tmp) * sqrtf(SQ(iq_set_tmp) - SQ(id_set_tmp));
 		}
 
 		const float mod_q = motor_now->m_motor_state.mod_q_filter;
 
+		// fw是磁场弱化, 这里公式化减去id和iq电流, 但是当最大弱磁电流设置为0时, 这个值为0.
+		// 弱磁是一直在跑的(详见foc_math.c中foc_run_fw函数的引用), 最大弱磁电流决定m_i_fw_set
 		// Running FW from the 1 khz timer seems fast enough.
 		//run_fw(motor_now, dt);
 		id_set_tmp -= motor_now->m_i_fw_set;
@@ -3391,6 +3404,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		// Apply current limits
 		// TODO: Consider D axis current for the input current as well. Currently this is done using
 		// l_in_current_map_start in update_override_limits.
+		// mod_q是归一化的vq, 是vq与母线电压的比值.
 		if (mod_q > 0.001) {
 			utils_truncate_number(&iq_set_tmp, conf_now->lo_in_current_min / mod_q, conf_now->lo_in_current_max / mod_q);
 		} else if (mod_q < -0.001) {
@@ -3409,7 +3423,12 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 
 		motor_now->m_motor_state.id_target = id_set_tmp;
 		motor_now->m_motor_state.iq_target = iq_set_tmp;
-
+		// 终于算完了, 已经得到正确的目标iq和id值, 接下来是输入电流控制器
+		// 控制器中涉及: 
+		// 1. iq和id到vq和vd的转换, 有vq和vd的解耦补偿
+		// 2. vq和vd到v_alpha和v_beta的转换, 使用的是park逆变换
+		// 3. 用v_alpha和v_beta计算SVPWM, 得到三相占空比
+		// we can never against the stream i know.
 		control_current(motor_now, dt);
 	} else {  //电机不运动的情况下的一堆计算
 		// Motor is not running
@@ -4291,7 +4310,7 @@ static void control_current(motor_all_state_t *motor, float dt) {
 	}
 
 	float Ierr_d = state_m->id_target - state_m->id;
-	float Ierr_q = state_m->iq_target - state_m->iq;
+	float Ierr_q = state_m->iq_target - state_m->iq;  // 计算误差项, 要应用PI控制器算Vd和Vq
 
 	float ki = conf_now->foc_current_ki;
 	if (conf_now->foc_temp_comp) {
@@ -4305,11 +4324,13 @@ static void control_current(motor_all_state_t *motor, float dt) {
 	state_m->vd = state_m->vd_int + Ierr_d * conf_now->foc_current_kp * d_gain_scale;
 	state_m->vq = state_m->vq_int + Ierr_q * conf_now->foc_current_kp;
 
+	// 考虑到vd和vq有耦合, 通过补偿降低耦合的影响
 	// Decoupling. Using feedforward this compensates for the fact that the equations of a PMSM
 	// are not really decoupled (the d axis current has impact on q axis voltage and visa-versa):
 	//      Resistance  Inductance   Cross terms   Back-EMF   (see www.mathworks.com/help/physmod/sps/ref/pmsm.html)
 	// vd = Rs*id   +   Ld*did/dt −  ωe*iq*Lq
 	// vq = Rs*iq   +   Lq*diq/dt +  ωe*id*Ld     + ωe*ψm
+	//                               ^^^^^^^^ 耦合项
 	float dec_vd = 0.0;
 	float dec_vq = 0.0;
 	float dec_bemf = 0.0;
