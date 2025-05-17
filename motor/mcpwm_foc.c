@@ -2,8 +2,8 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-25 20:23:49
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2025-05-17 13:24:31
- * @FilePath: \VESC_Code\motor\mcpwm_foc.c
+ * @LastEditTime: 2025-05-17 16:04:49
+ * @FilePath: \VESC\motor\mcpwm_foc.c
  * @Description: 
  * 
  * Copyright (c) 2025 by xiayuan, All Rights Reserved. 
@@ -4324,7 +4324,29 @@ static void control_current(motor_all_state_t *motor, float dt) {
 		ki = motor->m_current_ki_temp_comp;
 	}
 
-	// 接下来用到的kp和ki似乎是根据检测到的电机参数计算得出的
+	// PI控制器部分
+	// id_err -> PI控制器 -> 误差补偿 -> vd
+	// iq_err -> PI控制器 -> 误差补偿 -> vq
+	// 本质上我们只能输出电压，要知道将电压与电流如何对应, 需要对电机建模, 需要用到电机参数. //
+	// 忽略耦合因素, 电机系统开环传递函数是tf = 1/(Ls+R), 即电压是输入, 相线电流是输出.    //
+	// 那么根据需要的电流, 我们可以反推需要的电压, 但是直接套公式算, 是稳态的情况.          //
+	// 电机是要运动的, 是一个动态的场景, 为了实现动态场景下的自动控制, 我们选择一个PI控制器  // 
+	// 来满足系统的动态响应性能, 例如响应速度, 稳态误差等(不是二阶系统没有震荡超调问题)      //
+	// 系统框图:
+	//  ______________________________________________________________________________
+	// |                                                                             |
+	// | i_set -> (-) -> 得到i_err ->  (PI) -> 得到v_set -> (电机) -> 采样得到i_real   |
+	// |     	  /|\													|            |
+	// |		   |____________________________________________________|            |
+	// |_____________________________________________________________________________|
+	// 
+	// 这是一个开环系统的闭环反馈控制, 电机开环系统有一个极点在s = -(R/L)处, 加入PI控制器, //
+	// 是在系统中加入了一个s = 0处的极点(积分作用), 加入一个s = -(ki/kp)的零点,           //
+	// 结合根轨迹法, 修改kp和ki的值, 可以改变闭环系统的极点位置, 进而改变系统的动态响应性能 //
+	//
+	// VESC中, kp的计算与l成正比, ki的计算与r成正比, 原因如下:
+	// 1. 电感L越大, 电流上升越慢, 需要更大的kp来提高系统的响应速度.
+	// 2. 电阻R越大, 需要更大的ki来补偿电阻带来的稳态误差.
 	state_m->vd_int += Ierr_d * (ki * d_gain_scale * dt);
 	state_m->vq_int += Ierr_q * (ki * dt);
 
@@ -4332,7 +4354,8 @@ static void control_current(motor_all_state_t *motor, float dt) {
 	state_m->vd = state_m->vd_int + Ierr_d * conf_now->foc_current_kp * d_gain_scale;
 	state_m->vq = state_m->vq_int + Ierr_q * conf_now->foc_current_kp;
 
-	// 考虑到vd和vq有耦合, 通过补偿降低耦合的影响
+	// iq和id到vq和vd转换, 考虑到vd和vq有耦合, 通过补偿降低耦合的影响
+	// 下面这一步就是在计算耦合项, 然后对上面代码计算出的vd和vq进行补偿
 	// Decoupling. Using feedforward this compensates for the fact that the equations of a PMSM
 	// are not really decoupled (the d axis current has impact on q axis voltage and visa-versa):
 	//      Resistance  Inductance   Cross terms   Back-EMF   (see www.mathworks.com/help/physmod/sps/ref/pmsm.html)
@@ -4345,6 +4368,7 @@ static void control_current(motor_all_state_t *motor, float dt) {
 
 	if (motor->m_control_mode < CONTROL_MODE_HANDBRAKE && conf_now->foc_cc_decoupling != FOC_CC_DECOUPLING_DISABLED) {
 		switch (conf_now->foc_cc_decoupling) {
+		// 使用低通滤波后的值进行补偿, 补偿不是很精确, 但是可以避免噪声影响总体性能
 		case FOC_CC_DECOUPLING_CROSS:
 			dec_vd = state_m->iq_filter * motor->m_speed_est_fast * motor->p_lq; // m_speed_est_fast is ωe in [rad/s]
 			dec_vq = state_m->id_filter * motor->m_speed_est_fast * motor->p_ld;
@@ -4365,24 +4389,26 @@ static void control_current(motor_all_state_t *motor, float dt) {
 		}
 	}
 
+	// 计算耦合项结束, 应用耦合项
 	state_m->vd -= dec_vd; //Negative sign as in the PMSM equations
 	state_m->vq += dec_vq + dec_bemf;
 
 	// Calculate the max length of the voltage space vector without overmodulation.
 	// Is simply 1/sqrt(3) * v_bus. See https://microchipdeveloper.com/mct5001:start. Adds margin with max_duty.
-	float max_v_mag = ONE_BY_SQRT3 * max_duty * state_m->v_bus;
+	float max_v_mag = ONE_BY_SQRT3 * max_duty * state_m->v_bus;  // 这个是SVPWM的理论最大电压幅值
 
 	// Saturation and anti-windup. Notice that the d-axis has priority as it controls field
 	// weakening and the efficiency.
 	float vd_presat = state_m->vd;
 	utils_truncate_number_abs((float*)&state_m->vd, max_v_mag);
-	state_m->vd_int += (state_m->vd - vd_presat);
+	state_m->vd_int += (state_m->vd - vd_presat);  // 为什么要修改vd的积分项? 这就是anti-windup吗?
 
-	float max_vq = sqrtf(SQ(max_v_mag) - SQ(state_m->vd));
+	float max_vq = sqrtf(SQ(max_v_mag) - SQ(state_m->vd));  //通过vd计算最大vq(向量合成的方式)
 	float vq_presat = state_m->vq;
 	utils_truncate_number_abs((float*)&state_m->vq, max_vq);
-	state_m->vq_int += (state_m->vq - vq_presat);
+	state_m->vq_int += (state_m->vq - vq_presat);  // 限幅后-限幅前, 然后在积分项上加上这个差值, 这样做有什么理论依据吗?
 
+	// 最终, 如果饱和/超最大幅度, 对vq和vd进行整体限幅
 	utils_saturate_vector_2d((float*)&state_m->vd, (float*)&state_m->vq, max_v_mag);
 
 	// mod_d and mod_q are normalized such that 1 corresponds to the max possible voltage:

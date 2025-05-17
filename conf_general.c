@@ -1446,10 +1446,10 @@ void conf_general_calc_apply_foc_cc_kp_ki_gain(mc_configuration *mcconf, float t
 	float l = mcconf->foc_motor_l;
 	float lambda = mcconf->foc_motor_flux_linkage;
 
-	float bw = 1.0 / (tc * 1e-6);
+	float bw = 1.0 / (tc * 1e-6);  // 唯一调用的地方, tc = 1000, 也就是实际带宽是1000Hz
 	float kp = l * bw;
 	float ki = r * bw;
-	float gain = 1.0e-3 / SQ(lambda);
+	float gain = 1.0e-3 / SQ(lambda);  //闭环增益吗
 	//	float gain = (0.00001 / r) / SQ(lambda); // Old method
 
 	mcconf->foc_current_kp = kp;
