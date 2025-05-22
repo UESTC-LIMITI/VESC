@@ -2,7 +2,7 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-25 20:23:49
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2025-05-17 16:04:49
+ * @LastEditTime: 2025-05-20 15:24:12
  * @FilePath: \VESC\motor\mcpwm_foc.c
  * @Description: 
  * 
@@ -4748,11 +4748,13 @@ static void update_valpha_vbeta(motor_all_state_t *motor, float mod_alpha, float
 	state_m->va = Va;
 	state_m->vb = Vb;
 	state_m->vc = Vc;
+	// 算出死区时间对电压的影响, 减掉
 	state_m->mod_alpha_measured = mod_alpha;
 	state_m->mod_beta_measured = mod_beta;
 
 	// v_alpha = 2/3*Va - 1/3*Vb - 1/3*Vc
 	// v_beta  = 1/sqrt(3)*Vb - 1/sqrt(3)*Vc
+	// 计算上次采样得到的v_alpha和v_beta
 	float v_alpha = (1.0 / 3.0) * (2.0 * Va - Vb - Vc);
 	float v_beta = ONE_BY_SQRT3 * (Vb - Vc);
 
@@ -4767,15 +4769,18 @@ static void update_valpha_vbeta(motor_all_state_t *motor, float mod_alpha, float
 	}
 
 	float abs_rpm = fabsf(RADPS2RPM_f(motor->m_speed_est_fast));
+	// 弄一个速度出来干什么呢
 
 	float filter_const = 1.0;
 	if (abs_rpm < 10000.0) {
+		// 用速度决定的滤波器参数
 		filter_const = utils_map(abs_rpm, 0.0, 10000.0, 0.01, 1.0);
 	}
 
 	float v_mag = NORM2_f(v_alpha, v_beta);
 	// The 0.1 * v_mag term below compensates for the filter attenuation as the speed increases.
 	// It is chosen by trial and error, so this can be improved.
+	// 进行低通滤波，速度越快滤波效果越不明显/本次数据对滤波数据作用越大
 	UTILS_LP_FAST(state_m->v_mag_filter, v_mag + 0.1 * v_mag * filter_const, filter_const);
 	UTILS_LP_FAST(state_m->mod_alpha_filter, mod_alpha, filter_const);
 	UTILS_LP_FAST(state_m->mod_beta_filter, mod_beta, filter_const);
@@ -4817,9 +4822,10 @@ static void update_valpha_vbeta(motor_all_state_t *motor, float mod_alpha, float
 		}
 #endif
 	} else {
+		// 这就是更新v_alpha和v_beta的地方, 更新的是本次采样值
 		state_m->v_alpha = v_alpha;
 		state_m->v_beta = v_beta;
-		state_m->is_using_phase_filters = false;
+		state_m->is_using_phase_filters = false; 
 
 #ifdef HW_USE_LINE_TO_LINE
 		// rotate alpha-beta 30 degrees to compensate for line-to-line phase voltage sensing
