@@ -2,8 +2,8 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-25 20:23:49
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2025-05-17 16:04:49
- * @FilePath: \VESC\motor\mcpwm_foc.c
+ * @LastEditTime: 2025-05-17 17:50:31
+ * @FilePath: \VESC_Code\motor\mcpwm_foc.c
  * @Description: 
  * 
  * Copyright (c) 2025 by xiayuan, All Rights Reserved. 
@@ -4415,6 +4415,7 @@ static void control_current(motor_all_state_t *motor, float dt) {
 	//    voltage_normalize = 1/(2/3*V_bus)
 	// This includes overmodulation and therefore cannot be made in any direction.
 	// Note that this scaling is different from max_v_mag, which is without over modulation.
+	// 以下是一个归一化, 但是乘了一个1.5, 为什么?
 	const float voltage_normalize = 1.5 / state_m->v_bus;
 	state_m->mod_d = state_m->vd * voltage_normalize;
 	state_m->mod_q = state_m->vq * voltage_normalize;
@@ -4433,6 +4434,7 @@ static void control_current(motor_all_state_t *motor, float dt) {
 	state_m->i_abs_filter = NORM2_f(state_m->id_filter, state_m->iq_filter);
 
 	// Inverse Park transform: transforms the (normalized) voltages from the rotor reference frame to the stator frame
+	// 利用归一化后的vd和vq计算出一对mod_alpha和mod_beta, raw代表什么?
 	state_m->mod_alpha_raw = c * state_m->mod_d - s * state_m->mod_q;
 	state_m->mod_beta_raw  = c * state_m->mod_q + s * state_m->mod_d;
 
@@ -4714,6 +4716,9 @@ static void update_valpha_vbeta(motor_all_state_t *motor, float mod_alpha, float
 #endif
 #else
 #ifdef HW_HAS_3_SHUNTS
+	// 以下是计算采样到的电压, ofs之前已解释过, 视为0即可;
+	// ADC采样的到的是分压, 下面的内容是转换为实际电压;
+	// 用到的分压电阻可以在硬件配置中改, LIMITI用到的是2.2k和39k的
 	Va = (ADC_VOLTS(ADC_IND_SENS1) - ofs_volt[0]) * ((VIN_R1 + VIN_R2) / VIN_R2) * ADC_VOLTS_PH_FACTOR;
 	Vb = (ADC_VOLTS(ADC_IND_SENS2) - ofs_volt[1]) * ((VIN_R1 + VIN_R2) / VIN_R2) * ADC_VOLTS_PH_FACTOR;
 	Vc = (ADC_VOLTS(ADC_IND_SENS3) - ofs_volt[2]) * ((VIN_R1 + VIN_R2) / VIN_R2) * ADC_VOLTS_PH_FACTOR;
