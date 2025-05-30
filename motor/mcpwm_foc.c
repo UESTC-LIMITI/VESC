@@ -2,8 +2,8 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-25 20:23:49
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2025-05-22 19:29:15
- * @FilePath: \VESC\motor\mcpwm_foc.c
+ * @LastEditTime: 2025-05-26 09:38:42
+ * @FilePath: \VESC_Code\motor\mcpwm_foc.c
  * @Description: 
  * 
  * Copyright (c) 2025 by xiayuan, All Rights Reserved. 
@@ -272,15 +272,14 @@ static void timer_reinit(int f_zv) {
 
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
 
-	// TIM2配置为PWM输出, 三个PWM输出对应电机驱动芯片的三个PWM输入
-	// foc计算采用TIM2的中断信号就是为了保证每一个PWM周期都能触发ADC采样, 都能计算一次
+	// TIM2配置为PWM输出, 实际不输出PWM, 所以period拉满, 配置为向上计数作为工具定时器.
 	TIM_TimeBaseStructure.TIM_Prescaler = 0;
 	TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
 	TIM_TimeBaseStructure.TIM_Period = 0xFFFF;
 	TIM_TimeBaseStructure.TIM_ClockDivision = 0;
 	TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;
 	TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
-
+	// 主要是需要这个output compare模式, 这样才能产生CC中断信号.
 	TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
 	TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
 	TIM_OCInitStructure.TIM_Pulse = 250;
@@ -299,9 +298,8 @@ static void timer_reinit(int f_zv) {
 	TIM_CCPreloadControl(TIM2, ENABLE);
 
 	// PWM outputs have to be enabled in order to trigger ADC on CCx
-	TIM_CtrlPWMOutputs(TIM2, ENABLE); 
-	// 一开始就使能TIM2的PWM输出, 虽然没有必要一开始就计算foc和输出PWM, 
-	// 但是因为TIM2的CCx输出是ADC的触发源, 为了保证ADC一直采样, 需要提前使能
+	TIM_CtrlPWMOutputs(TIM2, ENABLE);  
+	// 因为TIM2的CCx输出是ADC的触发源, 为了保证ADC一直采样, 需要提前使能
 
 #if defined HW_HAS_DUAL_MOTORS || defined HW_HAS_DUAL_PARALLEL
 	// See: https://www.cnblogs.com/shangdawei/p/4758988.html
@@ -314,6 +312,7 @@ static void timer_reinit(int f_zv) {
 	TIM_SelectInputTrigger(TIM2, TIM_TS_ITR1);
 	TIM_SelectSlaveMode(TIM2, TIM_SlaveMode_Reset);
 #else
+	// TIM1的TIM_TRGOSource_Update作为重置信号, 即TIM1输出一个PWM波完成后, TIM2计数重置一次
 	TIM_SelectOutputTrigger(TIM1, TIM_TRGOSource_Update);
 	TIM_SelectMasterSlaveMode(TIM1, TIM_MasterSlaveMode_Enable);
 	TIM_SelectInputTrigger(TIM2, TIM_TS_ITR0);
@@ -3077,7 +3076,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 	}
 
 	if (motor_now->m_state == MC_STATE_RUNNING) {//电机运动的情况下的一堆赋值和计算
-		if (conf_now->foc_current_sample_mode == FOC_CURRENT_SAMPLE_MODE_ALL_SENSORS) { //使用三个采样电阻  // 似乎不会有这种情况
+		if (conf_now->foc_current_sample_mode == FOC_CURRENT_SAMPLE_MODE_ALL_SENSORS) { //使用三个采样电阻  
 			// Full Clarke Transform
 			motor_now->m_motor_state.i_alpha = (2.0 / 3.0) * ia - (1.0 / 3.0) * ib - (1.0 / 3.0) * ic;
 			motor_now->m_motor_state.i_beta = ONE_BY_SQRT3 * ib - ONE_BY_SQRT3 * ic;
@@ -4434,6 +4433,7 @@ static void control_current(motor_all_state_t *motor, float dt) {
 	//    voltage_normalize = 1/(2/3*V_bus)
 	// This includes overmodulation and therefore cannot be made in any direction.
 	// Note that this scaling is different from max_v_mag, which is without over modulation.
+	// 以下是一个归一化, 但是乘了一个1.5, 为什么?
 	const float voltage_normalize = 1.5 / state_m->v_bus;
 	state_m->mod_d = state_m->vd * voltage_normalize;
 	state_m->mod_q = state_m->vq * voltage_normalize;
@@ -4454,6 +4454,7 @@ static void control_current(motor_all_state_t *motor, float dt) {
 
 	// Inverse Park transform: transforms the (normalized) voltages from the rotor reference frame to the stator frame
 	// 目标dq轴电压转换为目标αβ轴电压, 接下来根据SVPWM原理, 可以直接由αβ轴电压计算出各相占空比
+	// 利用归一化后的vd和vq计算出一对mod_alpha和mod_beta, raw代表什么?
 	state_m->mod_alpha_raw = c * state_m->mod_d - s * state_m->mod_q;
 	state_m->mod_beta_raw  = c * state_m->mod_q + s * state_m->mod_d;
 
@@ -4467,6 +4468,8 @@ static void control_current(motor_all_state_t *motor, float dt) {
 	update_valpha_vbeta(motor, state_m->mod_alpha_raw, state_m->mod_beta_raw);
 
 	// Dead time compensated values for vd and vq. Note that these are not used to control the switching times.
+	// 之前vd, vq一直是目标电压, 现在这个变量被复用为采样到的实际电压, 因为是实际电压, 所以经过了死区时间补偿, 
+	// 所以称 Dead time compensated values
 	state_m->vd = c * motor->m_motor_state.v_alpha + s * motor->m_motor_state.v_beta;
 	state_m->vq = c * motor->m_motor_state.v_beta  - s * motor->m_motor_state.v_alpha;
 
@@ -4746,6 +4749,9 @@ static void update_valpha_vbeta(motor_all_state_t *motor, float mod_alpha, float
 #endif
 #else
 #ifdef HW_HAS_3_SHUNTS
+	// 以下是计算采样到的电压, ofs之前已解释过, 视为0即可;
+	// ADC采样的到的是分压, 下面的内容是转换为实际电压;
+	// 用到的分压电阻可以在硬件配置中改, LIMITI用到的是2.2k和39k的
 	Va = (ADC_VOLTS(ADC_IND_SENS1) - ofs_volt[0]) * ((VIN_R1 + VIN_R2) / VIN_R2) * ADC_VOLTS_PH_FACTOR;
 	Vb = (ADC_VOLTS(ADC_IND_SENS2) - ofs_volt[1]) * ((VIN_R1 + VIN_R2) / VIN_R2) * ADC_VOLTS_PH_FACTOR;
 	Vc = (ADC_VOLTS(ADC_IND_SENS3) - ofs_volt[2]) * ((VIN_R1 + VIN_R2) / VIN_R2) * ADC_VOLTS_PH_FACTOR;
