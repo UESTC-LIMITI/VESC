@@ -2,7 +2,7 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-25 20:23:49
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2025-05-20 15:24:12
+ * @LastEditTime: 2025-05-22 19:29:15
  * @FilePath: \VESC\motor\mcpwm_foc.c
  * @Description: 
  * 
@@ -3431,6 +3431,9 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		// we can never against the stream i know.
 		control_current(motor_now, dt);
 	} else {  //电机不运动的情况下的一堆计算
+		// 电机不运动, 所有目标电压电流都设置为0, 到那时保留测量值的更新
+		// 例如调用update_valpha_vbeta函数更新v_alpha和v_beta, 
+		// 以及更新observer, 能够一定程度上追踪相位变化.
 		// Motor is not running
 
 		// The current is 0 when the motor is undriven
@@ -3461,6 +3464,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		// The observer phase offset has to be added here as well, with 0.5 switching cycles offset
 		// compared to when running. Otherwise going from undriven to driven causes a current
 		// spike.
+		// 根据电机的转速来估计相位的变化, 如果不做这个补偿, 从静止到运动会有电流尖峰.
 		motor_now->m_phase_now_observer += motor_now->m_pll_speed * dt * conf_now->foc_observer_offset;
 		utils_norm_angle_rad((float*)&motor_now->m_phase_now_observer);
 
@@ -3533,7 +3537,9 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		UTILS_NAN_ZERO(motor_now->m_motor_state.vd);
 		UTILS_NAN_ZERO(motor_now->m_motor_state.vq);
 
-		UTILS_LP_FAST(motor_now->m_motor_state.vd, vd_tmp, 0.2);
+		// 测量到的vd和vq, 经过低通滤波, 接下来用于计算电机占空比
+		// 由于是不进行主动驱动的状态, 这里的vd和vq是电机的反电动势吗?
+		UTILS_LP_FAST(motor_now->m_motor_state.vd, vd_tmp, 0.2);  
 		UTILS_LP_FAST(motor_now->m_motor_state.vq, vq_tmp, 0.2);
 
 		// Set the current controller integrator to the BEMF voltage to avoid
@@ -3545,6 +3551,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		if (conf_now->foc_cc_decoupling == FOC_CC_DECOUPLING_BEMF || 
 				conf_now->foc_cc_decoupling == FOC_CC_DECOUPLING_CROSS_BEMF) {  //反电动势（BEMF）解耦
 			motor_now->m_motor_state.vq_int -= motor_now->m_pll_speed * conf_now->foc_motor_flux_linkage;
+			// 也就是对反电动势进行补偿
 		}
 
 		// Update corresponding modulation
@@ -3572,11 +3579,22 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		break;
 	};
 
+	// PLL速度估计是什么? 如何实现? 还需学习
+	//
+	// 原理: 
+	// 本质是用相位进行估计(相位和速度一起估计). 使用这个周期的实际相位和上个周期对这个周期的相位估计, 
+	// 比较误差, 使用比例来修正相位估计, 积分来修正速度估计, 给出这个周期对下个周期的相位估计(和速度估计).
+	// 
+	// 目的: 
+	// 这样做的主要目的是获得更准确、更实时的电机状态估计（如速度、位置），以便为观测器（如反电动势观测器、
+	// 磁链观测器）和高级控制器（如前馈补偿、解耦、速度环、位置环等）提供可靠的输入。
+	//
 	// Run PLL for speed estimation
 	foc_pll_run(phase_for_speed_est, dt, &motor_now->m_pll_phase, &motor_now->m_pll_speed, conf_now);
 
 	// Low latency speed estimation, for e.g. HFI and speed control.
 	{
+		// 除了pll外, 还进行快读的速度估计
 		float diff = utils_angle_difference_rad(phase_for_speed_est, motor_now->m_phase_before_speed_est);
 		utils_truncate_number(&diff, -M_PI / 3.0, M_PI / 3.0);
 
@@ -3584,7 +3602,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		UTILS_NAN_ZERO(motor_now->m_speed_est_fast);
 
 		UTILS_LP_FAST(motor_now->m_speed_est_faster, diff / dt, 0.2);
-		UTILS_NAN_ZERO(motor_now->m_speed_est_faster);
+		UTILS_NAN_ZERO(motor_now->m_speed_est_faster);  // 低通滤波系数越大, 响应越快
 
 		float diff_corr = utils_angle_difference_rad(motor_now->m_motor_state.phase, motor_now->m_phase_before_speed_est_corrected);
 		utils_truncate_number(&diff_corr, -M_PI / 3.0, M_PI / 3.0);
@@ -3600,6 +3618,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 	}
 
 	// Update tachometer (resolution = 60 deg as for BLDC)
+	// 这个东西好像没用到的样子
 	float ph_tmp = motor_now->m_motor_state.phase;
 	utils_norm_angle_rad(&ph_tmp);
 	int step = (int)floorf((ph_tmp + M_PI) / (2.0 * M_PI) * 6.0);
@@ -3618,7 +3637,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 
 	// Track position control angle
 	float angle_now = 0.0;
-	if (encoder_is_configured()) {
+	if (encoder_is_configured()) {  // 在这里进行了某个多圈编码器的更新?
 		if (conf_now->m_sensor_port_mode == SENSOR_PORT_MODE_TS5700N8501_MULTITURN) {
 			angle_now = encoder_read_deg_multiturn();
 		} else {
@@ -4418,6 +4437,7 @@ static void control_current(motor_all_state_t *motor, float dt) {
 	const float voltage_normalize = 1.5 / state_m->v_bus;
 	state_m->mod_d = state_m->vd * voltage_normalize;
 	state_m->mod_q = state_m->vq * voltage_normalize;
+	// 计算归一化的目标dq轴电压, 使用归一化是为了方便计算占空比
 	UTILS_NAN_ZERO(state_m->mod_q_filter);
 	UTILS_LP_FAST(state_m->mod_q_filter, state_m->mod_q, 0.2);
 
@@ -4433,15 +4453,24 @@ static void control_current(motor_all_state_t *motor, float dt) {
 	state_m->i_abs_filter = NORM2_f(state_m->id_filter, state_m->iq_filter);
 
 	// Inverse Park transform: transforms the (normalized) voltages from the rotor reference frame to the stator frame
+	// 目标dq轴电压转换为目标αβ轴电压, 接下来根据SVPWM原理, 可以直接由αβ轴电压计算出各相占空比
 	state_m->mod_alpha_raw = c * state_m->mod_d - s * state_m->mod_q;
 	state_m->mod_beta_raw  = c * state_m->mod_q + s * state_m->mod_d;
 
+	// 这个函数是整个流程中唯一根据本轮采样值更新v_alpha和v_beta的地方，
+	// 再次更新v_alpha和v_beta前, 一直用这个数据.
+	//
+	// 疑问: 为什么不在一开始就更新v_alpha和v_beta呢? 这样会不会更好?
+	// 可能的答案: 前面几乎没有用到v_alpha和v_beta, 用的最多的本轮采样值是ia, ib, ic, 
+	// 以及根据本轮采样ia, ib, ic计算出来的i_alpha和i_beta, 以及进一步计算出来的计算本轮采样id和iq,
+	// 接下来
 	update_valpha_vbeta(motor, state_m->mod_alpha_raw, state_m->mod_beta_raw);
 
 	// Dead time compensated values for vd and vq. Note that these are not used to control the switching times.
 	state_m->vd = c * motor->m_motor_state.v_alpha + s * motor->m_motor_state.v_beta;
 	state_m->vq = c * motor->m_motor_state.v_beta  - s * motor->m_motor_state.v_alpha;
 
+	// HFI部分开始
 	// HFI
 	if (do_hfi) {
 #ifdef HW_HAS_DUAL_MOTORS
@@ -4652,6 +4681,7 @@ static void control_current(motor_all_state_t *motor, float dt) {
 		motor->m_hfi.prev_sample = 0.0;
 		motor->m_hfi.double_integrator = 0.0;
 	}
+	// HFI部分结束
 
 	// Set output (HW Dependent)
 	uint32_t duty1, duty2, duty3, top;
@@ -4659,8 +4689,10 @@ static void control_current(motor_all_state_t *motor, float dt) {
 
 	// Calculate the duty cycles for all the phases. This also injects a zero modulation signal to
 	// be able to fully utilize the bus voltage. See https://microchipdeveloper.com/mct5001:start
+	// SVPWM部分, 由目标αβ轴电压计算出各相的占空比
 	foc_svm(state_m->mod_alpha_raw, state_m->mod_beta_raw, top, &duty1, &duty2, &duty3, (uint32_t*)&state_m->svm_sector);
 
+	// 更新占空比, 电流控制部分结束
 	if (motor == &m_motor_1) {
 		TIMER_UPDATE_DUTY_M1(duty1, duty2, duty3);
 #ifdef HW_HAS_DUAL_PARALLEL
