@@ -2,7 +2,7 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2024-01-25 20:23:49
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2025-05-26 09:38:42
+ * @LastEditTime: 2025-08-25 20:06:53
  * @FilePath: \VESC_Code\motor\mcpwm_foc.c
  * @Description: 
  * 
@@ -3332,7 +3332,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 				// 下面这个函数, 把hfi的相位当作encoder来和observer的相位做融合.
 				motor_now->m_motor_state.phase = foc_correct_encoder(
 						motor_now->m_phase_now_observer,
-						motor_now->m_hfi.angle,
+						motor_now->m_hfi.angle,  //hfi计算的相位的唯一用途：与observer的相位做融合
 						motor_now->m_speed_est_fast,
 						conf_now->foc_sl_erpm_hfi,
 						motor_now);
@@ -3371,7 +3371,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		if (conf_now->foc_mtpa_mode != MTPA_MODE_OFF && ld_lq_diff != 0.0) {
 			const float lambda = conf_now->foc_motor_flux_linkage;
 
-			float iq_ref = iq_set_tmp;
+			float iq_ref = iq_set_tmp;  //这个就是 Is
 			if (conf_now->foc_mtpa_mode == MTPA_MODE_IQ_MEASURED) {
 				iq_ref = utils_min_abs(iq_set_tmp, motor_now->m_motor_state.iq_filter);
 				// 使用iq_set_tmp和iq_filter的最小值来计算.
@@ -3388,7 +3388,9 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 			}
 			// 根据神秘公式计算id和iq的值, 还需学习MTPA的原理, 详见上面的链接
 			id_set_tmp = (lambda - sqrtf(SQ(lambda) + 8.0 * SQ(ld_lq_diff * iq_ref))) / (4.0 * ld_lq_diff);
-			iq_set_tmp = SIGN(iq_set_tmp) * sqrtf(SQ(iq_set_tmp) - SQ(id_set_tmp));
+			iq_set_tmp = SIGN(iq_set_tmp) * sqrtf(SQ(iq_set_tmp) - SQ(id_set_tmp));  
+			// iq_set_tmp有变量复用的嫌疑，在上面是速度环pi控制器计算的目标转矩电流，到这里不仅多出一个复制品iq_ref，
+			// 还变成了MTPA计算的iq, 沟槽的本杰明差点给我绕晕了
 		}
 
 		const float mod_q = motor_now->m_motor_state.mod_q_filter;
@@ -3571,11 +3573,11 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		break;
 	};
 
-	// Run PLL for speed estimation
+	// Run PLL for speed estimation  //锁相环看一下
 	foc_pll_run(phase_for_speed_est, dt, &motor_now->m_pll_phase, &motor_now->m_pll_speed, conf_now);
 
 	// Low latency speed estimation, for e.g. HFI and speed control.
-	{
+	{  / hfi中要用到这个速度
 		float diff = utils_angle_difference_rad(phase_for_speed_est, motor_now->m_phase_before_speed_est);
 		utils_truncate_number(&diff, -M_PI / 3.0, M_PI / 3.0);
 
@@ -3994,11 +3996,11 @@ static THD_FUNCTION(timer_thread, arg) {
 	}
 }
 
-static void hfi_update(volatile motor_all_state_t *motor, float dt) {
+static void hfi_update(volatile motor_all_state_t *motor, float dt) {  // hfi采样分析部分
 	(void)dt;
 	float rpm_abs = fabsf(RADPS2RPM_f(motor->m_speed_est_fast));
 
-	if (rpm_abs > motor->m_conf->foc_sl_erpm_hfi) {
+	if (rpm_abs > motor->m_conf->foc_sl_erpm_hfi) {  // 速度太快, 不用hfi吗
 		motor->m_hfi.angle = motor->m_phase_now_observer;
 		motor->m_hfi.double_integrator = -motor->m_speed_est_fast;
 	}
@@ -4033,8 +4035,8 @@ static void hfi_update(volatile motor_all_state_t *motor, float dt) {
 #endif
 		} else {
 			float real_bin1, imag_bin1, real_bin2, imag_bin2;
-			motor->m_hfi.fft_bin1_func((float*)motor->m_hfi.buffer, &real_bin1, &imag_bin1);
-			motor->m_hfi.fft_bin2_func((float*)motor->m_hfi.buffer, &real_bin2, &imag_bin2);
+			motor->m_hfi.fft_bin1_func((float*)motor->m_hfi.buffer, &real_bin1, &imag_bin1);  //快速傅里叶变换得出基频分量信息
+			motor->m_hfi.fft_bin2_func((float*)motor->m_hfi.buffer, &real_bin2, &imag_bin2);  //得出二次谐波分量
 
 			float mag_bin_1 = NORM2_f(imag_bin1, real_bin1);
 			float angle_bin_1 = -utils_fast_atan2(imag_bin1, real_bin1);
@@ -4053,9 +4055,9 @@ static void hfi_update(volatile motor_all_state_t *motor, float dt) {
 			} else {
 				dt_sw = 1.0 / (motor->m_conf->foc_f_zv / 2.0);
 			}
-			angle_bin_2 += motor->m_pll_speed * ((float)motor->m_hfi.samples / 2.0) * dt_sw;
+			angle_bin_2 += motor->m_pll_speed * ((float)motor->m_hfi.samples / 2.0) * dt_sw; //基于转速补偿相位
 
-			if (fabsf(utils_angle_difference_rad(angle_bin_2 + M_PI, motor->m_hfi.angle)) <
+			if (fabsf(utils_angle_difference_rad(angle_bin_2 + M_PI, motor->m_hfi.angle)) <  //与上一次计算得到的相位进行绝对值比较, 由于相位不可能突变, 所以这个判断方法还行
 					fabsf(utils_angle_difference_rad(angle_bin_2, motor->m_hfi.angle))) {
 				angle_bin_2 += M_PI;
 			}
@@ -4249,6 +4251,8 @@ static THD_FUNCTION(pid_thread, arg) {
  *
  * @param dt
  * The time step in seconds.
+ * 
+ * 执行频率: 1/2采样频率, 即svpwm频率
  */
 static void control_current(motor_all_state_t *motor, float dt) {
 	volatile motor_state_t *state_m = &motor->m_motor_state;
@@ -4415,6 +4419,7 @@ static void control_current(motor_all_state_t *motor, float dt) {
 	// This includes overmodulation and therefore cannot be made in any direction.
 	// Note that this scaling is different from max_v_mag, which is without over modulation.
 	// 以下是一个归一化, 但是乘了一个1.5, 为什么?
+	// 我想到等幅值clark变换中，为了保证ia = i_alpha, 有一个1.5倍的系数, 会不会和这个有关?
 	const float voltage_normalize = 1.5 / state_m->v_bus;
 	state_m->mod_d = state_m->vd * voltage_normalize;
 	state_m->mod_q = state_m->vq * voltage_normalize;
@@ -4457,7 +4462,7 @@ static void control_current(motor_all_state_t *motor, float dt) {
 		CURRENT_FILTER_OFF();
 #endif
 
-		float mod_alpha_v7 = state_m->mod_alpha_raw;
+		float mod_alpha_v7 = state_m->mod_alpha_raw;  // 在已经计算的alpha和beta上注入
 		float mod_beta_v7 = state_m->mod_beta_raw;
 
 #ifdef HW_HAS_PHASE_SHUNTS
@@ -4473,10 +4478,10 @@ static void control_current(motor_all_state_t *motor, float dt) {
 					conf_now->foc_hfi_voltage_run, conf_now->foc_hfi_voltage_max);
 		}
 
-		utils_truncate_number_abs(&hfi_voltage, state_m->v_bus * (1.0 - fabsf(state_m->duty_now)) * SQRT3_BY_2 * (2.0 / 3.0) * 0.95);
+		utils_truncate_number_abs(&hfi_voltage, state_m->v_bus * (1.0 - fabsf(state_m->duty_now)) * SQRT3_BY_2 * (2.0 / 3.0) * 0.95);  // 对注入电压限幅, duty越大注入幅值越小
 
 		if ((conf_now->foc_sensor_mode == FOC_SENSOR_MODE_HFI_V4 || conf_now->foc_sensor_mode == FOC_SENSOR_MODE_HFI_V5) && hfi_est_done) {
-			if (motor->m_hfi.is_samp_n) {
+			if (motor->m_hfi.is_samp_n) {  //在hfi采样点, 计算下一个周期的注入量, 这个变量是周期跳变的, 一个svpwm内为true, 下一个为false
 				float sample_now = c * motor->m_i_beta_sample_with_offset - s * motor->m_i_alpha_sample_with_offset;
 				float di = (motor->m_hfi.prev_sample - sample_now);
 
@@ -4513,15 +4518,16 @@ static void control_current(motor_all_state_t *motor, float dt) {
 					motor->m_i_alpha_beta_has_offset = true;
 				}
 #else
-				mod_alpha_v7 -= hfi_voltage * c * voltage_normalize;
+				//这个是高频方波, 乘以c和s是因为注入的方波是基于dq轴而言(ud = hfi_voltage, uq = 0), 映射到alpha和beta要旋转一个电角度
+				mod_alpha_v7 -= hfi_voltage * c * voltage_normalize; 
 				mod_beta_v7 -= hfi_voltage * s * voltage_normalize;
 #endif
-			} else {
+			} else {  //在下一个周期, 注入幅值相同方向相反的电压
 				motor->m_hfi.prev_sample = c * state_m->i_beta - s * state_m->i_alpha;
 				mod_alpha_v7 += hfi_voltage * c * voltage_normalize;
 				mod_beta_v7  += hfi_voltage * s * voltage_normalize;
-			}
-		} else if ((conf_now->foc_sensor_mode == FOC_SENSOR_MODE_HFI_V2 || conf_now->foc_sensor_mode == FOC_SENSOR_MODE_HFI_V3) && hfi_est_done) {
+			}  ////////////////////////////////////////////////////////////////////////////////////////////////
+		} else if ((conf_now->foc_sensor_mode == FOC_SENSOR_MODE_HFI_V2 || conf_now->foc_sensor_mode == FOC_SENSOR_MODE_HFI_V3) && hfi_est_done) {  //这个模式注入的是相位偏移45度的高频方波,
 			if (motor->m_hfi.is_samp_n) {
 				if (fabsf(state_m->iq_target) > conf_now->foc_hfi_hyst) {
 					motor->m_hfi.sign_last_sample = SIGN(state_m->iq_target);
@@ -4585,8 +4591,8 @@ static void control_current(motor_all_state_t *motor, float dt) {
 				mod_alpha_v7 -= hfi_voltage * motor->m_hfi.cos_last * voltage_normalize;
 				mod_beta_v7  -= hfi_voltage * motor->m_hfi.sin_last * voltage_normalize;
 			}
-		} else {
-			if (motor->m_hfi.is_samp_n) {
+		} else {  // 这个模式注入的是高频旋转电压, 并非高频方波
+			if (motor->m_hfi.is_samp_n) {  
 				float sample_now = (utils_tab_sin_32_1[motor->m_hfi.ind * motor->m_hfi.table_fact] * state_m->i_alpha -
 						utils_tab_cos_32_1[motor->m_hfi.ind * motor->m_hfi.table_fact] * state_m->i_beta);
 				float di = (sample_now - motor->m_hfi.prev_sample);
@@ -4638,6 +4644,7 @@ static void control_current(motor_all_state_t *motor, float dt) {
 				(uint32_t*)&motor->m_duty3_next,
 				(uint32_t*)&state_m->svm_sector);
 			motor->m_duty_next_set = true;
+			// 经过hfi计算得到的注入后的alpha和beta,直接进行svpwm
 		}
 	} else {
 #ifdef HW_HAS_DUAL_MOTORS

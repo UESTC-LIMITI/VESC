@@ -1,0 +1,15 @@
+vesc_60_limiti\queue.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Middlewares/Third_Party/FreeRTOS/Source/queue.c
+vesc_60_limiti\queue.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdlib.h
+vesc_60_limiti\queue.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
+vesc_60_limiti\queue.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h
+vesc_60_limiti\queue.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stddef.h
+vesc_60_limiti\queue.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+vesc_60_limiti\queue.o: ../Core/Inc/FreeRTOSConfig.h
+vesc_60_limiti\queue.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Middlewares/Third_Party/FreeRTOS/Source/include/projdefs.h
+vesc_60_limiti\queue.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Middlewares/Third_Party/FreeRTOS/Source/include/portable.h
+vesc_60_limiti\queue.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Middlewares/Third_Party/FreeRTOS/Source/include/deprecated_definitions.h
+vesc_60_limiti\queue.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F/portmacro.h
+vesc_60_limiti\queue.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h
+vesc_60_limiti\queue.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Middlewares/Third_Party/FreeRTOS/Source/include/task.h
+vesc_60_limiti\queue.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Middlewares/Third_Party/FreeRTOS/Source/include/list.h
+vesc_60_limiti\queue.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Middlewares/Third_Party/FreeRTOS/Source/include/queue.h
