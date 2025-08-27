@@ -31,6 +31,9 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "foc_interface.h"
+#include "foc_callbacks.h"
+#include "utils_math.h"
 
 /* USER CODE END Includes */
 
@@ -63,6 +66,8 @@ void Error_Handler(void);
 #define B_CURR_GPIO_Port GPIOC
 #define C_CURR_Pin GPIO_PIN_2
 #define C_CURR_GPIO_Port GPIOC
+#define VIN_SENS_Pin GPIO_PIN_3
+#define VIN_SENS_GPIO_Port GPIOC
 #define VOLTAGE_1_Pin GPIO_PIN_0
 #define VOLTAGE_1_GPIO_Port GPIOA
 #define VOLTAGE_2_Pin GPIO_PIN_1

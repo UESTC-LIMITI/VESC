@@ -26,6 +26,7 @@ vesc_60_limiti\stm32f4xx_hal_msp.o: C:/Users/MikanseiP/STM32Cube/Repository/STM3
 vesc_60_limiti\stm32f4xx_hal_msp.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_adc.h
 vesc_60_limiti\stm32f4xx_hal_msp.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_ll_adc.h
 vesc_60_limiti\stm32f4xx_hal_msp.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_adc_ex.h
+vesc_60_limiti\stm32f4xx_hal_msp.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_can.h
 vesc_60_limiti\stm32f4xx_hal_msp.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash.h
 vesc_60_limiti\stm32f4xx_hal_msp.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash_ex.h
 vesc_60_limiti\stm32f4xx_hal_msp.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash_ramfunc.h

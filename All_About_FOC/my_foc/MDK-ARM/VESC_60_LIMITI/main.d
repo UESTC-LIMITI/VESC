@@ -26,6 +26,7 @@ vesc_60_limiti\main.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V
 vesc_60_limiti\main.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_adc.h
 vesc_60_limiti\main.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_ll_adc.h
 vesc_60_limiti\main.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_adc_ex.h
+vesc_60_limiti\main.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_can.h
 vesc_60_limiti\main.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash.h
 vesc_60_limiti\main.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash_ex.h
 vesc_60_limiti\main.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash_ramfunc.h
@@ -45,6 +46,7 @@ vesc_60_limiti\main.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V
 vesc_60_limiti\main.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Middlewares/Third_Party/FreeRTOS/Source/include/list.h
 vesc_60_limiti\main.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h
 vesc_60_limiti\main.o: ../Core/Inc/adc.h
+vesc_60_limiti\main.o: ../Core/Inc/can.h
 vesc_60_limiti\main.o: ../Core/Inc/dma.h
 vesc_60_limiti\main.o: ../Core/Inc/tim.h
 vesc_60_limiti\main.o: ../Core/Inc/gpio.h

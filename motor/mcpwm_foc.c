@@ -4763,6 +4763,7 @@ static void update_valpha_vbeta(motor_all_state_t *motor, float mod_alpha, float
 	state_m->vc = Vc;
 	state_m->mod_alpha_measured = mod_alpha;
 	state_m->mod_beta_measured = mod_beta;
+	//这个的唯一作用好像就是算一算总线电压, 有这种数据总比没有好
 
 	// v_alpha = 2/3*Va - 1/3*Vb - 1/3*Vc
 	// v_beta  = 1/sqrt(3)*Vb - 1/sqrt(3)*Vc
