@@ -25,9 +25,11 @@
 #include "tim.h"
 #include "gpio.h"
 
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "can_bsp.h"
+#include "foc_interface.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -70,7 +72,7 @@ void MX_FREERTOS_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+  
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -99,8 +101,13 @@ int main(void)
   MX_TIM1_Init();
   MX_TIM2_Init();
   MX_CAN1_Init();
+  MX_TIM5_Init();
+  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
-
+  // enc_as504x_init(&as5047_cfg);
+  CAN_Init(&hcan1);
+  foc_init();
+  
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -184,6 +191,9 @@ void SystemClock_Config(void)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   /* USER CODE BEGIN Callback 0 */
+  if (htim->Instance == TIM4) {
+    interface_encoder_routine();
+  }
 
   /* USER CODE END Callback 0 */
   if (htim->Instance == TIM14) {

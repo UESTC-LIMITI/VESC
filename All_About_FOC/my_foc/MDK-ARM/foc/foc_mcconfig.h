@@ -1,8 +1,6 @@
 #ifndef FOC_MCCONFIG_H_
 #define FOC_MCCONFIG_H_
 
-#include "datatypes.h"
-
 /* -------------------------采样部分-------------------------- */
 #ifndef V_REG
 #define V_REG					3.3
@@ -49,10 +47,14 @@
 // CURRENT_SHUNT_RES 和采样电阻有关
 // Current ADC to amperes factor for the second motor
 // CURRENT_AMP_GAIN和采样芯片配置有关
+#define FAC_VOLTAGE				((V_REG / 4095.0) / ((VIN_R1 + VIN_R2) / VIN_R2))
 
 #define GET_A_CURRENT()		    (float)ADC_Value[ADC_IND_CURR1]
 #define GET_B_CURRENT()			(float)ADC_Value[ADC_IND_CURR2]
 #define GET_C_CURRENT()			(float)ADC_Value[ADC_IND_CURR3]
+#define GET_A_VOLTAGE()		 	(float)ADC_Value[ADC_IND_SENS1]
+#define GET_B_VOLTAGE()		 	(float)ADC_Value[ADC_IND_SENS2]
+#define GET_C_VOLTAGE()		 	(float)ADC_Value[ADC_IND_SENS3]
 
 /* -------------------------各项默认参数-------------------------- */
 // Limits

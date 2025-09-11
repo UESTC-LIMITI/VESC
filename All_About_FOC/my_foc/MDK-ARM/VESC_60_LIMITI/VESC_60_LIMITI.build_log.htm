@@ -22,117 +22,99 @@ Dialog DLL:      TCM.DLL V1.56.4.0
  
 <h2>Project:</h2>
 C:\Users\MikanseiP\Desktop\VESC_Code\All_About_FOC\my_foc\MDK-ARM\VESC_60_LIMITI.uvprojx
-Project File Date:  08/27/2025
+Project File Date:  09/07/2025
 
 <h2>Output:</h2>
 *** Using Compiler 'V5.05 update 1 (build 106)', folder: 'C:\Keil_v5\ARM\ARMCC\Bin'
-Rebuild target 'VESC_60_LIMITI'
-assembling startup_stm32f405xx.s...
-compiling stm32f4xx_hal_msp.c...
-compiling can.c...
-compiling dma.c...
-compiling stm32f4xx_it.c...
-compiling gpio.c...
-compiling stm32f4xx_hal_timebase_tim.c...
-compiling tim.c...
-compiling main.c...
-compiling stm32f4xx_hal_adc.c...
-compiling stm32f4xx_hal_adc_ex.c...
-compiling adc.c...
-compiling freertos.c...
-compiling stm32f4xx_ll_adc.c...
-compiling stm32f4xx_hal_flash_ramfunc.c...
-compiling stm32f4xx_hal_flash_ex.c...
-compiling stm32f4xx_hal_rcc_ex.c...
-compiling stm32f4xx_hal_gpio.c...
-compiling stm32f4xx_hal_flash.c...
-compiling stm32f4xx_hal.c...
-compiling stm32f4xx_hal_pwr_ex.c...
-compiling stm32f4xx_hal_cortex.c...
-compiling stm32f4xx_hal_dma_ex.c...
-compiling stm32f4xx_hal_dma.c...
-compiling stm32f4xx_hal_pwr.c...
-compiling stm32f4xx_hal_rcc.c...
-compiling croutine.c...
-compiling list.c...
-compiling event_groups.c...
-compiling timers.c...
-compiling stream_buffer.c...
-compiling queue.c...
-compiling tasks.c...
-compiling heap_4.c...
-compiling foc_commnication.c...
-compiling foc_encoders.c...
-compiling foc_math.c...
-compiling foc_mcconfig.c...
-compiling port.c...
-compiling system_stm32f4xx.c...
-../Core/Src/system_stm32f4xx.c(747): error: At end of source:  #5: cannot open source input file "vesc_60_limiti\system_stm32f4xx.crf": Permission denied
-../Core/Src/system_stm32f4xx.c: 0 warnings, 1 error
-compiling stm32f4xx_hal_exti.c...
-compiling stm32f4xx_hal_can.c...
-compiling stm32f4xx_hal_tim_ex.c...
-compiling foc_callbacks.c...
-foc\datatypes.h(294): warning:  #66-D: enumeration value is out of "int" range
-  	CAN_PACKET_MAKE_ENUM_32_BITS = 0xFFFFFFFF,
-foc\datatypes.h(397): error:  #101: "FOC_SENSOR_MODE_SENSORLESS" has already been declared in the current scope
-  	FOC_SENSOR_MODE_SENSORLESS = 0,
-foc\datatypes.h(398): error:  #101: "FOC_SENSOR_MODE_ENCODER" has already been declared in the current scope
-  	FOC_SENSOR_MODE_ENCODER,
-foc\datatypes.h(399): error:  #101: "FOC_SENSOR_MODE_HALL" has already been declared in the current scope
-  	FOC_SENSOR_MODE_HALL,
-foc\datatypes.h(400): error:  #101: "FOC_SENSOR_MODE_HFI" has already been declared in the current scope
-  	FOC_SENSOR_MODE_HFI,
-foc\datatypes.h(401): error:  #101: "FOC_SENSOR_MODE_HFI_START" has already been declared in the current scope
-  	FOC_SENSOR_MODE_HFI_START,
-foc\datatypes.h(402): error:  #101: "FOC_SENSOR_MODE_HFI_V2" has already been declared in the current scope
-  	FOC_SENSOR_MODE_HFI_V2,
-foc\datatypes.h(403): error:  #101: "FOC_SENSOR_MODE_HFI_V3" has already been declared in the current scope
-  	FOC_SENSOR_MODE_HFI_V3,
-foc\datatypes.h(404): error:  #101: "FOC_SENSOR_MODE_HFI_V4" has already been declared in the current scope
-  	FOC_SENSOR_MODE_HFI_V4,
-foc\datatypes.h(405): error:  #101: "FOC_SENSOR_MODE_HFI_V5" has already been declared in the current scope
-  	FOC_SENSOR_MODE_HFI_V5
-foc\datatypes.h(406): error:  #256: invalid redeclaration of type name "mc_foc_sensor_mode" (declared at line 328)
-  } mc_foc_sensor_mode;
-foc\foc_callbacks.c(12): warning:  #1-D: last line of file ends without a newline
-  }
-foc\foc_callbacks.c: 2 warnings, 10 errors
+Build target 'VESC_60_LIMITI'
 compiling foc_interface.c...
-foc\datatypes.h(294): warning:  #66-D: enumeration value is out of "int" range
-  	CAN_PACKET_MAKE_ENUM_32_BITS = 0xFFFFFFFF,
-foc\datatypes.h(397): error:  #101: "FOC_SENSOR_MODE_SENSORLESS" has already been declared in the current scope
-  	FOC_SENSOR_MODE_SENSORLESS = 0,
-foc\datatypes.h(398): error:  #101: "FOC_SENSOR_MODE_ENCODER" has already been declared in the current scope
-  	FOC_SENSOR_MODE_ENCODER,
-foc\datatypes.h(399): error:  #101: "FOC_SENSOR_MODE_HALL" has already been declared in the current scope
-  	FOC_SENSOR_MODE_HALL,
-foc\datatypes.h(400): error:  #101: "FOC_SENSOR_MODE_HFI" has already been declared in the current scope
-  	FOC_SENSOR_MODE_HFI,
-foc\datatypes.h(401): error:  #101: "FOC_SENSOR_MODE_HFI_START" has already been declared in the current scope
-  	FOC_SENSOR_MODE_HFI_START,
-foc\datatypes.h(402): error:  #101: "FOC_SENSOR_MODE_HFI_V2" has already been declared in the current scope
-  	FOC_SENSOR_MODE_HFI_V2,
-foc\datatypes.h(403): error:  #101: "FOC_SENSOR_MODE_HFI_V3" has already been declared in the current scope
-  	FOC_SENSOR_MODE_HFI_V3,
-foc\datatypes.h(404): error:  #101: "FOC_SENSOR_MODE_HFI_V4" has already been declared in the current scope
-  	FOC_SENSOR_MODE_HFI_V4,
-foc\datatypes.h(405): error:  #101: "FOC_SENSOR_MODE_HFI_V5" has already been declared in the current scope
-  	FOC_SENSOR_MODE_HFI_V5
-foc\datatypes.h(406): error:  #256: invalid redeclaration of type name "mc_foc_sensor_mode" (declared at line 328)
-  } mc_foc_sensor_mode;
-foc\foc_interface.c(4): error:  #147: declaration is incompatible with "uint16_t ADC_Value[8]" (declared at line 24 of "foc\foc_interface.h")
-  volatile uint16_t ADC_Value[ADC_CHANNEL_NUM] = {0};  //存放DMA传输过来的采样�?                    ^
-foc\foc_interface.c(15): warning:  #167-D: argument of type "void (*)(void)" is incompatible with parameter of type "void (*)(DMA_HandleTypeDef *)"
-      HAL_DMA_RegisterCallback(&hdma_adc1, HAL_DMA_XFER_CPLT_CB_ID, dma_tc_callback);
-foc\foc_interface.c(22): warning:  #1-D: last line of file ends without a newline
+./utils/utils_math.h(166): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  	if (*angle < 0.0) {
+./utils/utils_math.h(167): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  		*angle += 360.0;
+./utils/utils_math.h(180): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  	while (*angle >=  M_PI) { *angle -= 2.0 * M_PI; }
+./utils/utils_math.h(235): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  	if (mag < 1e-10) {
+foc\foc_interface.c(27): warning:  #177-D: variable "motor_state" was declared but never referenced
+      volatile motor_state_t *motor_state = &m->m_motor_state;
+foc\foc_interface.c(67): warning:  #177-D: variable "motor_state" was declared but never referenced
+  	volatile motor_state_t *motor_state = &m->m_motor_state;
+foc\foc_interface.c(80): warning:  #177-D: variable "motor_state" was declared but never referenced
+      volatile motor_state_t *motor_state = &m->m_motor_state;
+foc\foc_interface.c(89): warning:  #177-D: variable "motor_state" was declared but never referenced
+      volatile motor_state_t *motor_state = &m->m_motor_state;
+foc\foc_interface.c(98): warning:  #177-D: variable "motor_state" was declared but never referenced
+      volatile motor_state_t *motor_state = &m->m_motor_state;
+foc\foc_interface.c(107): warning:  #177-D: variable "motor_state" was declared but never referenced
+      volatile motor_state_t *motor_state = &m->m_motor_state;
+foc\foc_interface.c(130): warning:  #167-D: argument of type "volatile float *" is incompatible with parameter of type "float *"
+          utils_truncate_number_abs(&m->m_pos_i_term, conf->l_p_i_term_max);
+foc\foc_interface.c(142): warning:  #167-D: argument of type "volatile float *" is incompatible with parameter of type "float *"
+          utils_truncate_number_abs(&m->m_speed_i_term, conf->l_s_i_term_max);
+foc\foc_interface.c(160): warning:  #1-D: last line of file ends without a newline
   }
-foc\foc_interface.c(19): warning:  #177-D: function "foc_config_init" was declared but never referenced
-  static void foc_config_init(motor_all_state_t* motor) {
-foc\foc_interface.c: 4 warnings, 11 errors
-compiling stm32f4xx_hal_tim.c...
-compiling cmsis_os2.c...
-"VESC_60_LIMITI\VESC_60_LIMITI.axf" - 22 Error(s), 6 Warning(s).
+foc\foc_interface.c(116): warning:  #177-D: variable "motor_state" was declared but never referenced
+      volatile motor_state_t *motor_state = &m->m_motor_state;
+foc\foc_interface.c(120): warning:  #177-D: variable "current_output" was declared but never referenced
+      float err, p_term, d_term, pos_output, speed_output, current_output;
+foc\foc_interface.c: 15 warnings, 0 errors
+compiling foc_callbacks.c...
+./utils/utils_math.h(166): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  	if (*angle < 0.0) {
+./utils/utils_math.h(167): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  		*angle += 360.0;
+./utils/utils_math.h(180): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  	while (*angle >=  M_PI) { *angle -= 2.0 * M_PI; }
+./utils/utils_math.h(235): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  	if (mag < 1e-10) {
+foc\foc_callbacks.c(27): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  	motor_state->i_alpha = (2.0 / 3.0) * (ia - 0.5 * (ib + ic));
+foc\foc_callbacks.c(42): warning:  #1-D: last line of file ends without a newline
+  }
+foc\foc_callbacks.c: 6 warnings, 0 errors
+compiling foc_encoders.c...
+./utils/utils_math.h(166): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  	if (*angle < 0.0) {
+./utils/utils_math.h(167): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  		*angle += 360.0;
+./utils/utils_math.h(180): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  	while (*angle >=  M_PI) { *angle -= 2.0 * M_PI; }
+./utils/utils_math.h(235): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  	if (mag < 1e-10) {
+foc\foc_encoders.c(85): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  	if (timestep > 1.0) {
+foc\foc_encoders.c(143): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  		cfg->state.last_enc_angle = ((float) pos * 360.0) / 16384.0;
+foc\foc_encoders.c(144): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  		UTILS_LP_FAST(cfg->state.spi_error_rate, 0.0, timestep);
+foc\foc_encoders.c(147): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  		UTILS_LP_FAST(cfg->state.spi_error_rate, 1.0, timestep);
+foc\foc_encoders.c: 8 warnings, 0 errors
+compiling main.c...
+./utils/utils_math.h(166): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  	if (*angle < 0.0) {
+./utils/utils_math.h(167): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  		*angle += 360.0;
+./utils/utils_math.h(180): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  	while (*angle >=  M_PI) { *angle -= 2.0 * M_PI; }
+./utils/utils_math.h(235): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  	if (mag < 1e-10) {
+../Core/Src/main.c: 4 warnings, 0 errors
+compiling freertos.c...
+./utils/utils_math.h(166): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  	if (*angle < 0.0) {
+./utils/utils_math.h(167): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  		*angle += 360.0;
+./utils/utils_math.h(180): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  	while (*angle >=  M_PI) { *angle -= 2.0 * M_PI; }
+./utils/utils_math.h(235): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  	if (mag < 1e-10) {
+../Core/Src/freertos.c: 4 warnings, 0 errors
+linking...
+Program Size: Code=30020 RO-data=648 RW-data=160 ZI-data=11552  
+FromELF: creating hex file...
+"VESC_60_LIMITI\VESC_60_LIMITI.axf" - 0 Error(s), 37 Warning(s).
 
 <h2>Software Packages used:</h2>
 
@@ -156,8 +138,7 @@ Package Vendor: Keil
 
    * Component: ARM::CMSIS:CORE:5.6.0
       Include file:  CMSIS/Core/Include/tz_context.h
-Target not created.
-Build Time Elapsed:  00:00:08
+Build Time Elapsed:  00:00:02
 </pre>
 </body>
 </html>

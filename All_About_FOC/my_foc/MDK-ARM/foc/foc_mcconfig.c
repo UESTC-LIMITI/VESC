@@ -1,4 +1,5 @@
 #include "foc_mcconfig.h"
+#include "datatypes.h"
 
 void confgenerator_set_defaults_mcconf(mc_configuration *conf) {
 	// conf->pwm_mode = MCCONF_PWM_MODE;

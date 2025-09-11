@@ -2,9 +2,9 @@
 #define FOC_CALLBACKS_H_
 
 #include "main.h"
-#include "datatypes.h"
-#include "foc_interface.h"
 
-void dma_tc_callback(void);
+void dma_tc_callback(DMA_HandleTypeDef *_hdma);
+
+
 
 #endif // FOC_CALLBACKS_H_

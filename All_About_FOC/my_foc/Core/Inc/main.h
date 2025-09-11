@@ -31,9 +31,9 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "foc_interface.h"
-#include "foc_callbacks.h"
-#include "utils_math.h"
+//#include "foc_interface.h"
+//#include "foc_callbacks.h"
+//#include "utils_math.h"
 
 /* USER CODE END Includes */
 

@@ -1,4 +1,14 @@
 /*
+ * @Author: xiayuan 1137542776@qq.com
+ * @Date: 2025-08-27 23:51:38
+ * @LastEditors: xiayuan 1137542776@qq.com
+ * @LastEditTime: 2025-09-06 02:13:34
+ * @FilePath: \VESC_Code\All_About_FOC\my_foc\MDK-ARM\utils\utils_math.h
+ * @Description: 
+ * 
+ * Copyright (c) 2025 by xiayuan, All Rights Reserved. 
+ */
+/*
 	Copyright 2016 - 2019 Benjamin Vedder	benjamin@vedder.se
 
 	This file is part of the VESC firmware.
@@ -119,6 +129,7 @@ void utils_rotate_vector3(float *input, float *rotation, float *output, bool rev
 #define COS_MINUS_30_DEG		(0.86602540378)
 #define SIN_MINUS_30_DEG		(-0.5)
 #define ONE_BY_SQRT2			(0.7071067811865475)
+#define M_PI		(3.14159265358979323846)
 
 // Tables
 extern const float utils_tab_sin_32_1[];

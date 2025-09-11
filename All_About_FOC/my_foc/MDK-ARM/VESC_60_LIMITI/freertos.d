@@ -45,3 +45,11 @@ vesc_60_limiti\freertos.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_
 vesc_60_limiti\freertos.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h
 vesc_60_limiti\freertos.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h
 vesc_60_limiti\freertos.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h
+vesc_60_limiti\freertos.o: ./foc/foc_interface.h
+vesc_60_limiti\freertos.o: ./foc/datatypes.h
+vesc_60_limiti\freertos.o: ./bps/spi_bb.h
+vesc_60_limiti\freertos.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdbool.h
+vesc_60_limiti\freertos.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
+vesc_60_limiti\freertos.o: ./foc/foc_mcconfig.h
+vesc_60_limiti\freertos.o: ./foc/foc_callbacks.h
+vesc_60_limiti\freertos.o: ./utils/utils_math.h

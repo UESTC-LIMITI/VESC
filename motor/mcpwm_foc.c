@@ -2774,7 +2774,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 
 	uint32_t t_start = timer_time_now();
 
-	bool is_v7 = !(TIM1->CR1 & TIM_CR1_DIR);  //用TIM1状态判断是不是“v7”
+	bool is_v7 = !(TIM1->CR1 & TIM_CR1_DIR);  //用TIM1状态判断是不是“v7” 向上计数的时候是v7
 	int norm_curr_ofs = 0;
 
 #ifdef HW_HAS_DUAL_MOTORS
@@ -4405,6 +4405,7 @@ static void control_current(motor_all_state_t *motor, float dt) {
 	float vd_presat = state_m->vd;
 	utils_truncate_number_abs((float*)&state_m->vd, max_v_mag);
 	state_m->vd_int += (state_m->vd - vd_presat);  // 为什么要修改vd的积分项? 这就是anti-windup吗?
+	// vd <= vd_presat, 相减出来的非正数, 意味着限幅前后的差值, 如果这个差值很大, 说明积分超调, 需要减小积分增益
 
 	float max_vq = sqrtf(SQ(max_v_mag) - SQ(state_m->vd));  //通过vd计算最大vq(向量合成的方式)
 	float vq_presat = state_m->vq;

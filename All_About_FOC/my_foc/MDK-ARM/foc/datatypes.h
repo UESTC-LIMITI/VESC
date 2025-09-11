@@ -2,7 +2,7 @@
  * @Author: xiayuan 1137542776@qq.com
  * @Date: 2025-08-27 19:14:11
  * @LastEditors: xiayuan 1137542776@qq.com
- * @LastEditTime: 2025-08-27 19:32:05
+ * @LastEditTime: 2025-09-07 00:08:41
  * @FilePath: \VESC_Code\All_About_FOC\my_foc\MDK-ARM\foc\datatypes.h
  * @Description: 
  * 
@@ -11,12 +11,45 @@
 #ifndef DATATYPES_H_
 #define DATATYPES_H_
 
+#include "spi_bb.h"
 #include <stdint.h>
 #include "main.h"
 #include <math.h>
 #include "stm32f4xx_hal.h"
 #include <stdbool.h>
-#include "foc_interface.h"
+
+//#include "foc_interface.h"
+
+typedef struct AS504x_diag_{
+	uint8_t is_connected;
+	uint8_t AGC_value;
+	uint16_t magnitude;
+	uint8_t is_OCF;
+	uint8_t is_COF;
+	uint8_t is_Comp_low;
+	uint8_t is_Comp_high;
+	uint16_t serial_diag_flgs;
+	uint16_t serial_magnitude;
+	uint16_t serial_error_flags;
+} AS504x_diag;
+
+typedef struct AS504x_state_{
+	uint16_t diag_fetch_now_count;
+	uint32_t data_last_invalid_counter;
+	uint32_t spi_communication_error_count;
+	uint8_t spi_data_err_raised;
+	AS504x_diag sensor_diag;
+	uint16_t spi_val;
+	float last_enc_angle;
+	uint32_t spi_error_cnt;
+	float spi_error_rate;
+	uint32_t last_update_time;
+} AS504x_state;   ///AS5047相关结构体 包含了各种读取角度
+
+typedef struct AS504x_config{
+	spi_bb_state sw_spi;
+	AS504x_state state;
+} AS504x_config_t;   //AS5047 初始化用的结构体
 
 // Communication commands
 typedef enum {
@@ -291,7 +324,7 @@ typedef enum {
 	CAN_PACKET_SELFLOCK_RELEASE	            = 86,
 	CAN_PACKET_RELEASE_MOTER                = 94,
 	CAN_PACKET_SET_ZERO_POS                = 95,
-	CAN_PACKET_MAKE_ENUM_32_BITS = 0xFFFFFFFF,
+//	CAN_PACKET_MAKE_ENUM_32_BITS = 0xFFFFFFFF,
 } CAN_PACKET_ID;
 
 typedef struct {
@@ -314,6 +347,14 @@ typedef enum {
 	SENSOR_MODE_SENSORED,
 	SENSOR_MODE_HYBRID
 } mc_sensor_mode;
+
+// FOC current controller decoupling mode.
+typedef enum {
+	FOC_CC_DECOUPLING_DISABLED = 0,
+	FOC_CC_DECOUPLING_CROSS,
+	FOC_CC_DECOUPLING_BEMF,
+	FOC_CC_DECOUPLING_CROSS_BEMF
+} mc_foc_cc_decoupling_mode;
 
 typedef enum {
 	FOC_SENSOR_MODE_SENSORLESS = 0,
@@ -392,18 +433,6 @@ typedef enum {
 	SENSOR_PORT_MODE_TLE5012_SSC_HW,
 	SENSOR_PORT_MODE_CUSTOM_ENCODER,
 } sensor_port_mode;
-
-typedef enum {
-	FOC_SENSOR_MODE_SENSORLESS = 0,
-	FOC_SENSOR_MODE_ENCODER,
-	FOC_SENSOR_MODE_HALL,
-	FOC_SENSOR_MODE_HFI,
-	FOC_SENSOR_MODE_HFI_START,
-	FOC_SENSOR_MODE_HFI_V2,
-	FOC_SENSOR_MODE_HFI_V3,
-	FOC_SENSOR_MODE_HFI_V4,
-	FOC_SENSOR_MODE_HFI_V5
-} mc_foc_sensor_mode;
 
 typedef struct {
 	// Limits
@@ -499,7 +528,7 @@ typedef struct {
 	bool foc_temp_comp;
 	float foc_temp_comp_base_temp;
 	float foc_current_filter_const;
-	// mc_foc_cc_decoupling_mode foc_cc_decoupling;  // 解耦方式, 暂时先用一种吧
+	mc_foc_cc_decoupling_mode foc_cc_decoupling;  // 解耦方式, 暂时先用一种吧
 	// mc_foc_observer_type foc_observer_type;  // 观测器模式, 暂时不上观测器
 	float foc_hfi_voltage_start;
 	float foc_hfi_voltage_run;
@@ -525,6 +554,10 @@ typedef struct {
 	float foc_fw_q_current_factor;
 	// FOC_SPEED_SRC foc_speed_soure;
 
+	// 电流环pid参数
+	float c_pid_kp;
+	float c_pid_ki;
+	float c_pid_kd;
 
 	// Speed PID
 	float s_pid_kp;
@@ -545,6 +578,11 @@ typedef struct {
 	float p_pid_ang_div;
 	float p_pid_gain_dec_angle;
 	float p_pid_offset;
+
+	float l_pid_out_max;
+	float l_c_i_term_max;
+	float l_s_i_term_max;
+	float l_p_i_term_max;
 
 	// Misc
 	int32_t m_fault_stop_time_ms;
@@ -691,6 +729,9 @@ typedef struct {             //电机的所有参数
 	float m_speed_i_term;
 	float m_speed_prev_error;
 	float m_speed_d_filter;
+	float m_current_i_term;
+	float m_current_prev_error;
+	float m_current_d_filter;
 	int m_ang_hall_int_prev;
 	//HALL 参数
 	bool m_using_hall;
@@ -716,5 +757,7 @@ typedef struct {             //电机的所有参数
 } motor_all_state_t;  
 // 在FOC计算里用到的电机所有参数
 // 包含interface.h里所有的电机参数
+
+extern volatile motor_all_state_t motor;
 
 #endif // DATATYPES_H_

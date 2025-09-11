@@ -36,8 +36,9 @@ vesc_60_limiti\foc_callbacks.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cub
 vesc_60_limiti\foc_callbacks.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h
 vesc_60_limiti\foc_callbacks.o: C:/Users/MikanseiP/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3/Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h
 vesc_60_limiti\foc_callbacks.o: foc\datatypes.h
-vesc_60_limiti\foc_callbacks.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
+vesc_60_limiti\foc_callbacks.o: ./bps/spi_bb.h
 vesc_60_limiti\foc_callbacks.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdbool.h
+vesc_60_limiti\foc_callbacks.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
 vesc_60_limiti\foc_callbacks.o: foc\foc_interface.h
-vesc_60_limiti\foc_callbacks.o: foc\datatypes.h
 vesc_60_limiti\foc_callbacks.o: foc\foc_mcconfig.h
+vesc_60_limiti\foc_callbacks.o: ./utils/utils_math.h

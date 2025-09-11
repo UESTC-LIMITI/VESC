@@ -50,3 +50,12 @@ vesc_60_limiti\main.o: ../Core/Inc/can.h
 vesc_60_limiti\main.o: ../Core/Inc/dma.h
 vesc_60_limiti\main.o: ../Core/Inc/tim.h
 vesc_60_limiti\main.o: ../Core/Inc/gpio.h
+vesc_60_limiti\main.o: ./foc/foc_encoders.h
+vesc_60_limiti\main.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdbool.h
+vesc_60_limiti\main.o: ./foc/foc_interface.h
+vesc_60_limiti\main.o: ./foc/datatypes.h
+vesc_60_limiti\main.o: ./bps/spi_bb.h
+vesc_60_limiti\main.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
+vesc_60_limiti\main.o: ./foc/foc_mcconfig.h
+vesc_60_limiti\main.o: ./foc/foc_callbacks.h
+vesc_60_limiti\main.o: ./utils/utils_math.h
